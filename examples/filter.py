@@ -36,11 +36,11 @@ def main():
                 pass
             # }}}
             # {{{ combine these lines into one function
-            [key, value] = subscriber.recv_multipart()
+            [_, value] = subscriber.recv_multipart()
             value = json.loads(value.decode('utf8'))
             prev = bayes_filter(prev, value)
             # }}}
-            print("Raw: {}: Filtered: {}".format(value,prev))
+            print("Raw: {}: Filtered: {}".format(value, prev))
     except KeyboardInterrupt:
         print("Shutting down")
 
