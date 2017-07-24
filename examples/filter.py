@@ -15,10 +15,10 @@ def main():
     # {{{ wrap this stuff
     context = zmq.Context()
     subscriber = context.socket(zmq.SUB)
-    subscriber.connect("tcp://localhost:5000")
+    subscriber.connect('tcp://localhost:5000')
     subscriber.subscribe(b'sensor')
 
-    subscriber.connect("tcp://localhost:9000")
+    subscriber.connect('tcp://localhost:9000')
     subscriber.subscribe(b'EXIT')
     # }}}
 
@@ -29,14 +29,15 @@ def main():
             # {{{ Wrap this stuff
             topic, value = subscriber.recv_multipart()
             if topic == b'EXIT':
-                print("Got exit command: {}".format(value.decode('utf8')))
+                print('Got {} command: {}'.format(topic.decode('utf8'),
+                                                  value.decode('utf8')))
                 return
             value = json.loads(value.decode('utf8'))
             # }}}
             prev = bayes_filter(prev, value)
-            print("Raw: {}: Filtered: {}".format(value, prev))
+            print('Raw: {}: Filtered: {}'.format(value, prev))
     except KeyboardInterrupt:
-        print("Shutting down")
+        print('Shutting down')
 
 if __name__ == '__main__':
     main()

@@ -9,15 +9,15 @@ import zmq
 def main():
     context = zmq.Context()
     shutdown = context.socket(zmq.PUB)
-    shutdown.bind("tcp://*:9000")
+    shutdown.bind('tcp://*:9000')
 
     shutdown.send(b'START')
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("Sending kill signal")
-        shutdown.send_multipart([b"EXIT", b"User requested shutdown"])
+        print('Sending kill signal')
+        shutdown.send_multipart([b'EXIT', b'User requested shutdown'])
         return
 
 if __name__ == '__main__':
