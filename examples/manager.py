@@ -17,7 +17,7 @@ def main():
             time.sleep(1)
     except KeyboardInterrupt:
         print("Sending kill signal")
-        shutdown.send(b"EXIT")
+        shutdown.send_multipart([b"EXIT", b"User requested shutdown"])
         return
 
 if __name__ == '__main__':

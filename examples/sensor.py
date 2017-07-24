@@ -17,14 +17,14 @@ def main():
 
     kill_sig = context.socket(zmq.SUB)
     kill_sig.connect("tcp://localhost:9000")
-    kill_sig.setsockopt(zmq.SUBSCRIBE, b"EXIT")
+    kill_sig.subscribe(b'EXIT')
     # }}}
 
     try:
         while True:
             try:  # Replace with polling?
-                kill_sig.recv(flags=zmq.NOBLOCK)
-                print("Got exit command")
+                signal, reason = kill_sig.recv_multipart(flags=zmq.NOBLOCK)
+                print("Got exit command: {}".format(reason.decode('utf8')))
                 return
             except zmq.ZMQError:
                 pass
