@@ -3,7 +3,7 @@
 # THIS FILE IS SUBJECT TO THE LICENSE TERMS GRANTED BY THE UNIVERSITY OF SASKATCHEWAN SPACE TEAM (USST).
 
 from threading import Thread # Threads are fully functional on Windows.
-from multiprocessing.process import BaseProcess # Still currently getting a TypeError when ._Popen() is called on Windows (as of August 20, 2017).
+from multiprocessing.context import Process # Processes are fully functional on Windows (as of August 20, 2017).
 import time
 import sys
 
@@ -48,6 +48,10 @@ class ProcessManager:
         """
 
     def status(self, thread):
+        if self.isEmpty():
+            return None
+        else:
+            None
         """
         TODO: Return the status of a thread or process
         """
@@ -65,7 +69,6 @@ class ProcessManager:
 threadNames = [] # This list is currently used for testing purposes.
 # Once the threading module is working fine, then we can begin connecting the proceses through 0mq.
 if __name__ == "__main__":
-    
     taskMgr=ProcessManager()
     for name in threadNames: # Create threads for each rover software
         taskMgr.createThread(name)
@@ -77,7 +80,7 @@ if __name__ == "__main__":
             """
             TODO Run the processes as they should.
             """
-            for task in taskMgr.T:
+            for task in taskMgr.T: # Verify tasks.
                 taskMgr.verify(task.name)
             time.sleep(3)
     except KeyboardInterrupt:
