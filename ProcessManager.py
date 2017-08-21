@@ -19,45 +19,45 @@ class ProcessManager:
         self.T = [] # Thread or process library (It is right now a list but it could be changed to something else other than a list).
         return super().__init__(**kwargs)
 
-    def isEmpty():
+    def isEmpty(self):
         if T == []:
             return True
         else:
             return False
 
-    def createProcess():
+    def createProcess(self):
         """
         TODO create a function that takes in parameters and uses those parameters to
         ceate one single process. The process must then be stored in "self.T".
         """
 
-    def createThread():
+    def createThread(self):
         """
         TODO create a function that takes in parameters and uses those parameters to
         ceate one single thread. The thread must then be stored in "self.T".
         """
 
-    def startAllProcesses():
+    def startAllProcesses(self):
         """
         TODO: create a function that starts all processes or threads in "self.T" all at once.
         """
 
-    def stopAllProcesses():
+    def stopAllProcesses(self):
         """
         TODO: create a function that stops all processes or threads in "self.T" all at once.
         """
 
-    def status(thread):
+    def status(self, thread):
         """
         TODO: Return the status of a thread or process
         """
 
-    def verify(thread):
+    def verify(self, thread):
         """
         TODO: Check the status of the thread or process and perform certain functions based on its status.
         """
 
-    def fix(thread):
+    def fix(self, thread):
         """
         TODO: Fix a thread or process if its not running properly. 
         """
