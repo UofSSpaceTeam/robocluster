@@ -31,6 +31,11 @@ class ProcessManager:
         ceate one single process. The process must then be stored in "self.T".
         """
 
+        command_list = {"ArmProcess" : "ArmProcess.py", "CameraProcess":"CameraProcess.py", "CanServer":"CanServer.py", "DriveProcess":"DriveProcess.py", "GPSProcess":"GPSProcess.py",
+                  "RoverProcess":"RoverProcess.py", "StateManager":"StateManager.py", "USBServer":"USBServer.py", "WebServer":"WebServer.py"}
+
+        return command_list
+
     def createThread(self):
         """
         TODO create a function that takes in parameters and uses those parameters to
@@ -41,6 +46,9 @@ class ProcessManager:
         """
         TODO: create a function that starts all processes or threads in "self.T" all at once.
         """
+
+        for command in command_list:
+            self.T.appemd(Popend(command))
 
     def stopAllProcesses(self):
         """
