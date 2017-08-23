@@ -25,16 +25,16 @@ class ProcessManager:
         else:
             return False
 
-    def createProcess(self):
+    def createProcess(self, command):
         """
         TODO create a function that takes in parameters and uses those parameters to
         ceate one single process. The process must then be stored in "self.T".
         """
 
-        command_list = {"ArmProcess" : "ArmProcess.py", "CameraProcess":"CameraProcess.py", "CanServer":"CanServer.py", "DriveProcess":"DriveProcess.py", "GPSProcess":"GPSProcess.py",
-                  "RoverProcess":"RoverProcess.py", "StateManager":"StateManager.py", "USBServer":"USBServer.py", "WebServer":"WebServer.py"}
+        self.T[command] = Process(group=None, target=None, name=command, args=(), kwargs={})
+        return self.T
 
-        return command_list
+
 
     def createThread(self):
         """
@@ -47,13 +47,19 @@ class ProcessManager:
         TODO: create a function that starts all processes or threads in "self.T" all at once.
         """
 
-        for command in command_list:
-            self.T.appemd(Popend(command))
+        for command in self.T:
+            self.T[command].start()
+            print( command + " started")
+
 
     def stopAllProcesses(self):
         """
         TODO: create a function that stops all processes or threads in "self.T" all at once.
         """
+
+        for command in self.T:
+            self.T[command].terminate()
+            print(command + " terminated")
 
     def status(self, thread):
         if self.isEmpty():
