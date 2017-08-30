@@ -8,6 +8,10 @@ import time
 import sys
 from subprocess import Popen
 
+class RoboProcesses:
+            def _init_(self, **kwargs):
+                Popen(set)
+
 class ProcessManager:
     """
     Class: ProcessManager
@@ -36,10 +40,6 @@ class ProcessManager:
         TODO create a function that takes in parameters and uses those parameters to
         ceate one single process. The process must then be stored in "self.T".
         """
-
-        class RoboProcesses:
-            def _init_(self, **kwargs):
-                Popen(set)
 
         process_list[name] = RoboProcesses(cmd = command, set = None)
         return process_list
