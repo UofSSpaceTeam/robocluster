@@ -9,10 +9,13 @@ import sys
 from subprocess import Popen
 
 class RoboProcesses:
-            def _init_(self, **kwargs):
-                Popen(set)
+            def _init_(self, cmd):
+                self.cmd = cmd
+                self.set = None
+                Popen(self.set)
 
-process_list = {} # also should I place the processes we have already in here? I remember that being done previously
+
+process_list = {}
 
 class ProcessManager:
     """
@@ -33,15 +36,14 @@ class ProcessManager:
             return False
 
 
-    def createProcess(self, name, command, process_list): #should I replace these parameters with *args? I'm still wary of using *args and **kwargs
+    def createProcess(self, name, command):
         """
         TODO create a function that takes in parameters and uses those parameters to
         ceate one single process. The process must then be stored in "self.T".
         """
 
-        process_list[name] = RoboProcesses(cmd = command, set = None)
+        process_list[name] = RoboProcesses(command)
         return process_list
-
 
 
     def createThread(self):
@@ -55,13 +57,19 @@ class ProcessManager:
         TODO: create a function that starts all processes or threads in "self.T" all at once.
         """
 
-        for command in command_list:
-            self.T.append(Popend(command))
+        for process in process_list:
+            process_list[process].set = process_list[process].cmd
 
     def stopAllProcesses(self):
         """
         TODO: create a function that stops all processes or threads in "self.T" all at once.
         """
+
+        print ("Shutting down")
+
+        for process in process_list:
+            process.kill()
+            process.wait()
 
     def status(self, thread):
         if self.isEmpty():
