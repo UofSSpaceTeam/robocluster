@@ -6,14 +6,15 @@ from threading import Thread # Threads are fully functional on Windows.
 from multiprocessing.context import Process # Processes are fully functional on Windows (as of August 20, 2017).
 import time
 import sys
+from subprocess import Popen
 
 class ProcessManager:
     """
     Class: ProcessManager
-    
+
     This class represents the pocessing module for the robocluster operating system.
     """
-    
+
     def __init__(self, **kwargs):
         """Initializes the process manager"""
         self.T = [] # Thread or process library (It is right now a list but it could be changed to something else other than a list).
@@ -25,14 +26,23 @@ class ProcessManager:
         else:
             return False
 
-    def createProcess(self, command):
+
+
+
+    process_list = {} # also should I place the processes we have already in here? I remember that being done previously
+
+    def createProcess(self, name, command, process_list): #should I replace these parameters with *args? I'm still wary of using *args and **kwargs
         """
         TODO create a function that takes in parameters and uses those parameters to
         ceate one single process. The process must then be stored in "self.T".
         """
 
-        self.T[command] = Process(group=None, target=None, name=command, args=(), kwargs={})
-        return self.T
+        class RoboProcesses:
+            def _init_(self, **kwargs):
+                Popen(set)
+
+        process_list[name] = RoboProcesses(cmd = command, set = None)
+        return process_list
 
 
 
@@ -47,19 +57,13 @@ class ProcessManager:
         TODO: create a function that starts all processes or threads in "self.T" all at once.
         """
 
-        for command in self.T:
-            self.T[command].start()
-            print( command + " started")
-
+        for command in command_list:
+            self.T.append(Popend(command))
 
     def stopAllProcesses(self):
         """
         TODO: create a function that stops all processes or threads in "self.T" all at once.
         """
-
-        for command in self.T:
-            self.T[command].terminate()
-            print(command + " terminated")
 
     def status(self, thread):
         if self.isEmpty():
