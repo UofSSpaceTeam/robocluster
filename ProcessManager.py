@@ -12,6 +12,8 @@ class RoboProcesses:
             def _init_(self, **kwargs):
                 Popen(set)
 
+process_list = {} # also should I place the processes we have already in here? I remember that being done previously
+
 class ProcessManager:
     """
     Class: ProcessManager
@@ -30,10 +32,6 @@ class ProcessManager:
         else:
             return False
 
-
-
-
-    process_list = {} # also should I place the processes we have already in here? I remember that being done previously
 
     def createProcess(self, name, command, process_list): #should I replace these parameters with *args? I'm still wary of using *args and **kwargs
         """
