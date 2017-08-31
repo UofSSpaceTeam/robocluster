@@ -9,13 +9,12 @@ import sys
 from subprocess import Popen
 
 class RoboProcesses:
-            def _init_(self, cmd):
-                self.cmd = cmd
-                self.set = None
-                Popen(self.set)
+    def __init__(self, cmd):
+        self.cmd = cmd
+    def execute(self):
+        Popen(self.cmd)
 
 
-process_list = {}
 
 class ProcessManager:
     """
@@ -23,6 +22,8 @@ class ProcessManager:
 
     This class represents the pocessing module for the robocluster operating system.
     """
+process_dict = {}
+
 
     def __init__(self, **kwargs):
         """Initializes the process manager"""
@@ -41,9 +42,12 @@ class ProcessManager:
         TODO create a function that takes in parameters and uses those parameters to
         ceate one single process. The process must then be stored in "self.T".
         """
+        if type(command) == str:
+            return True
+        else:
+            return False
+        process_dict[name] = RoboProcesses(command)
 
-        process_list[name] = RoboProcesses(command)
-        return process_list
 
 
     def createThread(self):
@@ -52,13 +56,17 @@ class ProcessManager:
         ceate one single thread. The thread must then be stored in "self.T".
         """
 
+    def startProcess(self, name):
+        process_dict[name].execute()
+
+
     def startAllProcesses(self):
         """
         TODO: create a function that starts all processes or threads in "self.T" all at once.
         """
 
-        for process in process_list:
-            process_list[process].set = process_list[process].cmd
+        for process in process_dict:
+            startProcess(process)
 
     def stopAllProcesses(self):
         """
@@ -67,9 +75,9 @@ class ProcessManager:
 
         print ("Shutting down")
 
-        for process in process_list:
-            process.kill()
-            process.wait()
+        for process in process_dict:
+            process.execute.kill()
+            process.execute.wait()
 
     def status(self, thread):
         if self.isEmpty():
