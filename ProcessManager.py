@@ -3,7 +3,7 @@
 # THIS FILE IS SUBJECT TO THE LICENSE TERMS GRANTED BY THE UNIVERSITY OF SASKATCHEWAN SPACE TEAM (USST).
 
 from threading import Thread # Threads are fully functional on Windows.
-from multiprocessing.context import Process # Processes are fully functional on Windows (as of August 20, 2017).
+from multiprocessing.context import Process # Processes are fully functional on Windows.
 import time
 import sys
 from subprocess import Popen
@@ -22,7 +22,7 @@ class ProcessManager:
 
     This class represents the pocessing module for the robocluster operating system.
     """
-process_dict = {}
+    process_dict = {}
 
 
     def __init__(self, **kwargs):
@@ -35,7 +35,6 @@ process_dict = {}
             return True
         else:
             return False
-
 
     def createProcess(self, name, command):
         """
