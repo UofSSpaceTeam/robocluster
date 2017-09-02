@@ -39,8 +39,11 @@ class ProcessManager:
 
     def createProcess(self, name, command):
         """
-        TODO create a function that takes in parameters and uses those parameters to
-        ceate one single process. The process must then be stored in "self.T".
+        Create a process.
+
+        Checks if command is type string if so it returns True otherwise it returns False
+        Checks if name has not been used otherwise informs that name is taken
+
         """
         if type(command) == str:
             for process in self.process_dict:
