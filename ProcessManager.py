@@ -11,8 +11,9 @@ from subprocess import Popen
 class RoboProcesses:
     def __init__(self, cmd):
         self.cmd = cmd
+        self.popen = None
     def execute(self):
-        Popen(self.cmd)
+        self.popen = Popen(self.cmd)
 
 
 
@@ -27,11 +28,11 @@ class ProcessManager:
 
     def __init__(self, **kwargs):
         """Initializes the process manager"""
-        self.T = [] # Thread or process library (It is right now a list but it could be changed to something else other than a list).
+        self.process_dict = {} # Thread or process library (It is right now a list but it could be changed to something else other than a list).
         return super().__init__(**kwargs)
 
     def isEmpty(self):
-        if T == []:
+        if self.process_dict == {}:
             return True
         else:
             return False
@@ -42,10 +43,17 @@ class ProcessManager:
         ceate one single process. The process must then be stored in "self.T".
         """
         if type(command) == str:
+            for process in self.process_dict:
+                if process == name:
+                    print ("Name already taken.")
+                    break
+            else:
+                self.process_dict[name] = RoboProcesses(command)
             return True
         else:
             return False
-        process_dict[name] = RoboProcesses(command)
+
+
 
 
 
@@ -56,7 +64,7 @@ class ProcessManager:
         """
 
     def startProcess(self, name):
-        process_dict[name].execute()
+        self.process_dict[name].execute()
 
 
     def startAllProcesses(self):
@@ -64,8 +72,8 @@ class ProcessManager:
         TODO: create a function that starts all processes or threads in "self.T" all at once.
         """
 
-        for process in process_dict:
-            startProcess(process)
+        for process in self.process_dict:
+            self.startProcess(process)
 
     def stopAllProcesses(self):
         """
@@ -74,7 +82,7 @@ class ProcessManager:
 
         print ("Shutting down")
 
-        for process in process_dict:
+        for process in self.process_dict:
             process.execute.kill()
             process.execute.wait()
 
