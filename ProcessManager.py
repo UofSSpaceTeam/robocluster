@@ -32,6 +32,9 @@ class ProcessManager:
         return super().__init__(**kwargs)
 
     def isEmpty(self):
+        """
+        Confirms whether process_dict is empty.
+        """
         if self.process_dict == {}:
             return True
         else:
@@ -39,10 +42,9 @@ class ProcessManager:
 
     def createProcess(self, name, command):
         """
-        Create a process.
-
-        Checks if command is type string if so it returns True otherwise it returns False
-        Checks if name has not been used otherwise informs that name is taken
+        Creates a process.
+        Checks if command is type string if so it returns True otherwise it returns False.
+        Checks if name has not been used otherwise informs that name is taken.
 
         """
         if type(command) == str:
@@ -67,12 +69,15 @@ class ProcessManager:
         """
 
     def startProcess(self, name):
+        """
+        Starts a single process.
+        """
         self.process_dict[name].execute()
 
 
     def startAllProcesses(self):
         """
-        TODO: create a function that starts all processes or threads in "self.T" all at once.
+        Starts all processes in process_dict.
         """
 
         for process in self.process_dict:
@@ -80,7 +85,7 @@ class ProcessManager:
 
     def stopAllProcesses(self):
         """
-        TODO: create a function that stops all processes or threads in "self.T" all at once.
+        Stops all processes in process_dict.
         """
 
         print ("Shutting down")
