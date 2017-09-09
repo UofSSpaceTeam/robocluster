@@ -23,12 +23,11 @@ class ProcessManager:
 
     This class represents the pocessing module for the robocluster operating system.
     """
-    process_dict = {}
 
 
     def __init__(self, **kwargs):
         """Initializes the process manager"""
-        self.process_dict = {} # Thread or process library (It is right now a list but it could be changed to something else other than a list).
+        self.process_dict = {} # Process dictionary: stores all processes
         return super().__init__(**kwargs)
 
     def isEmpty(self):
@@ -48,10 +47,8 @@ class ProcessManager:
 
         """
         if type(command) == str:
-            for process in self.process_dict:
-                if process == name:
-                    print ("Name already taken.")
-                    break
+            if name in self.process_dict:
+                print("Name already taken.")
             else:
                 self.process_dict[name] = RoboProcesses(command)
             return True
@@ -83,6 +80,16 @@ class ProcessManager:
         for process in self.process_dict:
             self.startProcess(process)
 
+    def stopProcess(self, name):
+        """
+        Stops a specific process in process_dict.
+        """
+
+        print ("Shutting down " + name)
+        self.process_dict[name].popen.kill()
+        self.process_dict[name].popen.wait()
+
+
     def stopAllProcesses(self):
         """
         Stops all processes in process_dict.
@@ -91,8 +98,8 @@ class ProcessManager:
         print ("Shutting down")
 
         for process in self.process_dict:
-            process.execute.kill()
-            process.execute.wait()
+            self.process_dict[process].popen.kill()
+            self.process_dict[process].popen.wait()
 
     def status(self, thread):
         if self.isEmpty():
