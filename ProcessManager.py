@@ -5,6 +5,7 @@
 import time
 import sys
 from subprocess import Popen
+import shlex
 
 
 class RoboProcesses:
@@ -14,7 +15,8 @@ class RoboProcesses:
         self.popen = None
 
     def execute(self):
-        self.popen = Popen(self.cmd)
+        args = shlex.split(self.cmd)
+        self.popen = Popen(args)
 
 
 class ProcessManager:
@@ -42,9 +44,9 @@ class ProcessManager:
         Creates a process.
         Checks if command is type string if so it returns True otherwise it returns False.
         Checks if name has not been used otherwise informs that name is taken.
-
         """
-        if type(command) == str:
+
+        if isinstance(command, str):
             if name in self.process_dict:
                 print("Name already taken.")
             else:
