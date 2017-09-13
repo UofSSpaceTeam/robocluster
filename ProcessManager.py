@@ -8,13 +8,24 @@ from subprocess import Popen
 import shlex
 
 
-class RoboProcesses:
+class RoboProcess:
+    """
+    Class: RoboProcess
 
+    This class contains the layout of the process
+    """
     def __init__(self, cmd):
+        """
+        This method creates a process containing command cmd.
+        """
         self.cmd = cmd
         self.popen = None
 
     def execute(self):
+        """
+        This method creates a Popen object and turns the command into an argument
+        that the Popen object can use.
+        """
         args = shlex.split(self.cmd)
         self.popen = Popen(args)
 
@@ -23,7 +34,7 @@ class ProcessManager:
     """
     Class: ProcessManager
 
-    This class represents the pocessing module for the robocluster operating system.
+    This class represents the processing module for the robocluster operating system.
     """
 
     def __init__(self, **kwargs):
