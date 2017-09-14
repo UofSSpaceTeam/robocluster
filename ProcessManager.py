@@ -7,21 +7,15 @@ import shlex
 
 
 class RoboProcess:
-    """
-    This class contains the layout and metadata of a process.
-    """
+    """Manages and keeps track of a process."""
+
     def __init__(self, cmd):
-        """
-        This method creates a process containing command cmd.
-        """
+        """Initialize a process containing command cmd."""
         self.cmd = cmd
         self.popen = None
 
     def execute(self):
-        """
-        This method creates a Popen object and turns the command into an argument
-        that the Popen object can use.
-        """
+        """Run the process's command."""
         args = shlex.split(self.cmd)
         self.popen = Popen(args)
 
@@ -29,6 +23,7 @@ class RoboProcess:
 class ProcessManager:
     """
     Manages processes that run in the robocluster framework.
+
     Processes are just programs that can run independantly
     from each other, in any language supported by the robocluster library.
     The ProcessManager is in charge of starting and stopping processes,
@@ -37,7 +32,7 @@ class ProcessManager:
     """
 
     def __init__(self):
-        """Initializes the process manager"""
+        """Initialize a process manager."""
         # process dictionary stores RoboProcess instances indexed
         # by the process name
         self.processes = {}
@@ -57,22 +52,22 @@ class ProcessManager:
 
     def createProcess(self, name, command):
         """
-        Creates a process.
-        Checks if command is type string if so it returns True otherwise it returns False.
-        Checks if name has not been used otherwise informs that name is taken.
+        Create a process.
+
+        Arguments:
+        name    - name to identify process, must be unique to process manager.
+        command - shell command for process to execute.
         """
+        if name in self.processes:
+            raise ValueError(f'Process with the same name exists: {name}')
 
-        if isinstance(command, str):
-            if name in self.processes:
-                print("Name already taken.")
-            else:
-                print("Created {}".format(name))
-                self.processes[name] = RoboProcess(command)
-            return True
-        else:
-            return False
+        if not isinstance(command, str):
+            raise ValueError('command must be a string')
 
-    def createThread(self): # TODO: Do we really need this if we have createProcess?
+        self.processes[name] = RoboProcess(command)
+
+    # TODO: Do we really need this if we have createProcess?
+    def createThread(self):
         """
         TODO create a function that takes in parameters and uses those parameters to
         ceate one single thread. The thread must then be stored in "self.T".
@@ -80,59 +75,42 @@ class ProcessManager:
         pass
 
     def startProcess(self, name):
-        """
-        Starts a single process.
-        """
+        """Start a single process."""
         print('Starting {}'.format(name))
         self.processes[name].execute()
 
     def startAllProcesses(self):
-        """
-        Starts all processes in processes.
-        """
-
+        """Start all managed processes."""
         for process in self.processes:
             self.startProcess(process)
 
     def stopProcess(self, name):
-        """
-        Stops a specific process in processes.
-        """
-
+        """Stop a process by name."""
         print ("Shutting down " + name)
         self.processes[name].popen.kill()
         self.processes[name].popen.wait()
 
     def stopAllProcesses(self):
-        """
-        Stops all processes in processes.
-        """
-
+        """Stop all managed processes."""
         print ("Shutting down")
-
         for process in self.processes:
             self.stopProcess(process)
 
     def status(self, thread):
-        """
-        TODO: Return the status of a thread or process
-        """
+        """Return the status of a thread or process."""
         raise NotImplementedError()
 
     def verify(self, thread):
-        """
-        TODO: Check the status of the thread or process and perform certain functions based on its status.
-        """
+        """Verify if a thread of process is running properly."""
         raise NotImplementedError()
 
     def fix(self, thread):
-        """
-        TODO: Fix a thread or process if its not running properly.
-        """
+        """Fix a thread or process if its not running properly."""
         raise NotImplementedError()
 
 
 def main():
+    """Run a process manager in the foreground."""
     process_names = [["sleep", "python sleeper.py"],
                      ["crash", "python crash.py"]]
     # Once the threading module is working fine, then we can begin connecting the proceses through 0mq.
