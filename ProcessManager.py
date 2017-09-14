@@ -52,13 +52,8 @@ class ProcessManager:
         return False
 
     def isEmpty(self):
-        """
-        Confirms whether processes is empty.
-        """
-        if self.processes == {}:
-            return True
-        else:
-            return False
+        """Return if processes is empty."""
+        return len(self.processes) == 0
 
     def createProcess(self, name, command):
         """
