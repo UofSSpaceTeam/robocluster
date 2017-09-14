@@ -136,10 +136,11 @@ class ProcessManager:
         """
         raise NotImplementedError()
 
-process_names = [["sleep", "python sleeper.py"],
-                 ["crash", "python crash.py"]]
-# Once the threading module is working fine, then we can begin connecting the proceses through 0mq.
-if __name__ == "__main__":
+
+def main():
+    process_names = [["sleep", "python sleeper.py"],
+                     ["crash", "python crash.py"]]
+    # Once the threading module is working fine, then we can begin connecting the proceses through 0mq.
     with ProcessManager() as manager:
         # Initialize all the processes
         for proc in process_names:
@@ -156,4 +157,7 @@ if __name__ == "__main__":
                 time.sleep(3)
         except KeyboardInterrupt:
             pass
-    sys.exit(0)
+
+
+if __name__ == "__main__":
+    exit(main())
