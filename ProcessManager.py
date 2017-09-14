@@ -40,7 +40,7 @@ class ProcessManager:
         """Initializes the process manager"""
         # process dictionary stores RoboProcess instances indexed
         # by the process name
-        self.process_dict = {}
+        self.processes = {}
 
     def __enter__(self):
         """Enter context manager."""
@@ -53,9 +53,9 @@ class ProcessManager:
 
     def isEmpty(self):
         """
-        Confirms whether process_dict is empty.
+        Confirms whether processes is empty.
         """
-        if self.process_dict == {}:
+        if self.processes == {}:
             return True
         else:
             return False
@@ -68,11 +68,11 @@ class ProcessManager:
         """
 
         if isinstance(command, str):
-            if name in self.process_dict:
+            if name in self.processes:
                 print("Name already taken.")
             else:
                 print("Created {}".format(name))
-                self.process_dict[name] = RoboProcess(command)
+                self.processes[name] = RoboProcess(command)
             return True
         else:
             return False
@@ -89,33 +89,33 @@ class ProcessManager:
         Starts a single process.
         """
         print('Starting {}'.format(name))
-        self.process_dict[name].execute()
+        self.processes[name].execute()
 
     def startAllProcesses(self):
         """
-        Starts all processes in process_dict.
+        Starts all processes in processes.
         """
 
-        for process in self.process_dict:
+        for process in self.processes:
             self.startProcess(process)
 
     def stopProcess(self, name):
         """
-        Stops a specific process in process_dict.
+        Stops a specific process in processes.
         """
 
         print ("Shutting down " + name)
-        self.process_dict[name].popen.kill()
-        self.process_dict[name].popen.wait()
+        self.processes[name].popen.kill()
+        self.processes[name].popen.wait()
 
     def stopAllProcesses(self):
         """
-        Stops all processes in process_dict.
+        Stops all processes in processes.
         """
 
         print ("Shutting down")
 
-        for process in self.process_dict:
+        for process in self.processes:
             self.stopProcess(process)
 
     def status(self, thread):
@@ -150,7 +150,7 @@ if __name__ == "__main__":
         try:
             while True: # Execute the processes.
                 # TODO Run the processes as they should.
-                for task in manager.process_dict: # Verify tasks.
+                for task in manager.processes: # Verify tasks.
                     # taskMgr.verify(task.name)
                     pass
                 time.sleep(3)
