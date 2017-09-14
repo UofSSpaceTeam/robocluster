@@ -42,6 +42,15 @@ class ProcessManager:
         # by the process name
         self.process_dict = {}
 
+    def __enter__(self):
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, *exc):
+        """Exit context manager, makes sure all processes are stopped."""
+        self.stopAllProcesses()
+        return False
+
     def isEmpty(self):
         """
         Confirms whether process_dict is empty.
@@ -131,20 +140,20 @@ process_names = [["sleep", "python sleeper.py"],
                  ["crash", "python crash.py"]]
 # Once the threading module is working fine, then we can begin connecting the proceses through 0mq.
 if __name__ == "__main__":
-    taskMgr = ProcessManager()
-    # Initialize all the processes
-    for proc in process_names:
-        taskMgr.createProcess(*proc)
+    with ProcessManager() as manager:
+        # Initialize all the processes
+        for proc in process_names:
+            manager.createProcess(*proc)
 
-    taskMgr.startAllProcesses()
+        manager.startAllProcesses()
 
-    try:
-        while True: # Execute the processes.
-            # TODO Run the processes as they should.
-            for task in taskMgr.process_dict: # Verify tasks.
-                # taskMgr.verify(task.name)
-                pass
-            time.sleep(3)
-    except KeyboardInterrupt:
-        taskMgr.stopAllProcesses()
-        sys.exit(0)
+        try:
+            while True: # Execute the processes.
+                # TODO Run the processes as they should.
+                for task in manager.process_dict: # Verify tasks.
+                    # taskMgr.verify(task.name)
+                    pass
+                time.sleep(3)
+        except KeyboardInterrupt:
+            pass
+    sys.exit(0)
