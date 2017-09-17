@@ -19,6 +19,17 @@ class RoboProcess:
         args = shlex.split(self.cmd)
         self.popen = Popen(args)
 
+    def status(self):
+        """Return the status of a process."""
+        raise NotImplementedError()
+
+    def verify(self):
+        """Verify if a process is running properly."""
+        raise NotImplementedError()
+
+    def fix(self):
+        """Fix a process if its not running properly."""
+        raise NotImplementedError()
 
 class ProcessManager:
     """
@@ -27,7 +38,7 @@ class ProcessManager:
     Processes are just programs that can run independantly
     from each other, in any language supported by the robocluster library.
     The ProcessManager is in charge of starting and stopping processes,
-    and monitering their status and handle the event of a crash
+    and monitoring their status and handle the event of a crash
     or a process not responding.
     """
 
@@ -43,7 +54,7 @@ class ProcessManager:
 
     def __exit__(self, *exc):
         """Exit context manager, makes sure all processes are stopped."""
-        self.stopAllProcesses()
+        self.stop()
         return False
 
     def isEmpty(self):
@@ -66,47 +77,40 @@ class ProcessManager:
 
         self.processes[name] = RoboProcess(command)
 
-    # TODO: Do we really need this if we have createProcess?
-    def createThread(self):
+
+    def start(self,**name):
         """
-        TODO create a function that takes in parameters and uses those parameters to
-        ceate one single thread. The thread must then be stored in "self.T".
+        Starts processes
+
+        Arguments:
+        name - name or set of names to identify process, must be unique to process manager.
         """
-        pass
 
-    def startProcess(self, name):
-        """Start a single process."""
-        print('Starting {}'.format(name))
-        self.processes[name].execute()
+        if name == []:
+            """Start all managed processes."""
+            for process in self.processes:
+                self.processes[name].execute()
+        else:
+            for process in name:
+                """Start a single process."""
+                print('Starting {}'.format(name))
+                self.processes[name].execute()
 
-    def startAllProcesses(self):
-        """Start all managed processes."""
-        for process in self.processes:
-            self.startProcess(process)
+    def stop(self,**name):
+        if name == []:
+            """Stop all managed processes."""
+            print("Shutting down")
+            for process in self.processes:
+                self.processes[name].popen.kill()
+                self.processes[name].popen.wait()
+        else:
+            for process in name:
+                """Stop a process by name."""
+                print("Shutting down " + name)
+                self.processes[name].popen.kill()
+                self.processes[name].popen.wait()
 
-    def stopProcess(self, name):
-        """Stop a process by name."""
-        print ("Shutting down " + name)
-        self.processes[name].popen.kill()
-        self.processes[name].popen.wait()
 
-    def stopAllProcesses(self):
-        """Stop all managed processes."""
-        print ("Shutting down")
-        for process in self.processes:
-            self.stopProcess(process)
-
-    def status(self, thread):
-        """Return the status of a thread or process."""
-        raise NotImplementedError()
-
-    def verify(self, thread):
-        """Verify if a thread of process is running properly."""
-        raise NotImplementedError()
-
-    def fix(self, thread):
-        """Fix a thread or process if its not running properly."""
-        raise NotImplementedError()
 
 
 def main():
@@ -119,7 +123,7 @@ def main():
         for proc in process_names:
             manager.createProcess(*proc)
 
-        manager.startAllProcesses()
+        manager.start()
 
         try:
             while True: # Execute the processes.
