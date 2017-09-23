@@ -1,88 +1,151 @@
-# File ProcessManager.py
-# 
-# THIS FILE IS SUBJECT TO THE LICENSE TERMS GRANTED BY THE UNIVERSITY OF SASKATCHEWAN SPACE TEAM (USST).
+"""THIS FILE IS SUBJECT TO THE LICENSE TERMS GRANTED BY THE UNIVERSITY OF SASKATCHEWAN SPACE TEAM (USST)."""
 
-from threading import Thread # Threads are fully functional on Windows.
-from multiprocessing.context import Process # Processes are fully functional on Windows (as of August 20, 2017).
-import time
+import shlex
 import sys
+from subprocess import Popen
+from time import sleep
+
+class RoboProcess:
+    """Manages and keeps track of a process."""
+
+    def __init__(self, cmd):
+        """Initialize a process containing command cmd."""
+        self.cmd = cmd
+        self.popen = None
+
+    def start(self):
+        """
+        Start the process.
+
+        Ignored if process is already running.
+        """
+        if not self.popen:
+            args = shlex.split(self.cmd)
+            self.popen = Popen(args)
+
+    def stop(self):
+        """
+        Stop the process.
+
+        Ignored if the process is not running.
+        """
+        if self.popen:
+            self.popen.terminate()
+            try:
+                self.popen.wait(timeout=1)
+            except TimeoutError:
+                self.popen.kill()
+                self.popen.wait()
+            self.popen = None
+
+    def status(self):
+        """Return the status of a process."""
+        raise NotImplementedError()
+
+    def verify(self):
+        """Verify if a process is running properly."""
+        raise NotImplementedError()
+
+    def fix(self):
+        """Fix a process if its not running properly."""
+        raise NotImplementedError()
 
 class ProcessManager:
     """
-    Class: ProcessManager
-    
-    This class represents the pocessing module for the robocluster operating system.
+    Manages processes that run in the robocluster framework.
+
+    Processes are programs that can run independently from each other, in any
+    language supported by the robocluster library.
+
+    The ProcessManager is in charge of starting and stopping processes, and
+    monitoring their status and handle the event of a crash or a process not
+    responding.
     """
-    
-    def __init__(self, **kwargs):
-        """Initializes the process manager"""
-        self.T = [] # Thread or process library (It is right now a list but it could be changed to something else other than a list).
-        return super().__init__(**kwargs)
+
+    def __init__(self):
+        """Initialize a process manager."""
+        self.processes = {}  # store processes by name
+
+    def __enter__(self):
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, *exc):
+        """Exit context manager, makes sure all processes are stopped."""
+        self.stop()
+        return False
 
     def isEmpty(self):
-        if T == []:
-            return True
-        else:
-            return False
+        """Return if processes is empty."""
+        return len(self.processes) == 0
 
-    def createProcess(self):
+    def createProcess(self, name, command):
         """
-        TODO create a function that takes in parameters and uses those parameters to
-        ceate one single process. The process must then be stored in "self.T".
-        """
+        Create a process.
 
-    def createThread(self):
+        Arguments:
+        name    - name to identify process, must be unique to process manager.
+        command - shell command for process to execute.
         """
-        TODO create a function that takes in parameters and uses those parameters to
-        ceate one single thread. The thread must then be stored in "self.T".
-        """
+        if name in self.processes:
+            raise ValueError('Process with the same name exists: {name}')
 
-    def startAllProcesses(self):
-        """
-        TODO: create a function that starts all processes or threads in "self.T" all at once.
-        """
+        if not isinstance(command, str):
+            raise ValueError('command must be a string')
 
-    def stopAllProcesses(self):
-        """
-        TODO: create a function that stops all processes or threads in "self.T" all at once.
-        """
+        self.processes[name] = RoboProcess(command)
 
-    def status(self, thread):
-        if self.isEmpty():
-            return None
-        else:
-            None
-        """
-        TODO: Return the status of a thread or process
-        """
 
-    def verify(self, thread):
+    def start(self, *names):
         """
-        TODO: Check the status of the thread or process and perform certain functions based on its status.
-        """
+        Start processes.
 
-    def fix(self, thread):
+        If no arguments are provided, starts all processes.
         """
-        TODO: Fix a thread or process if its not running properly. 
-        """
+        processes = names if names else self.processes.keys()
+        for process in processes:
+            try:
+                print('Starting:', process)
+                self.processes[process].start()
+            except KeyError:
+                pass
 
-threadNames = [] # This list is currently used for testing purposes.
-# Once the threading module is working fine, then we can begin connecting the proceses through 0mq.
+    def stop(self, *names):
+        """
+        Stop processes.
+
+        If no arguments are provided, stops all processes.
+        """
+        processes = names if names else self.processes.keys()
+        for process in processes:
+            try:
+                print('Stopping:', process)
+                self.processes[process].stop()
+            except KeyError:
+                pass
+
+
+def main():
+    """Run a process manager in the foreground."""
+    process_names = [
+        ["sleep", "python sleeper.py"],
+        ["crash", "python crash.py"],
+    ]
+
+    with ProcessManager() as manager:
+        """Initialize all the processes"""
+        for proc in process_names:
+            manager.createProcess(*proc)
+
+        manager.start()
+
+        try:
+            while True:
+                # TODO: Verify processes.
+                sleep(1)
+        except KeyboardInterrupt:
+            pass
+
+
 if __name__ == "__main__":
-    taskMgr=ProcessManager()
-    for name in threadNames: # Create threads for each rover software
-        taskMgr.createThread(name)
-
-    taskMgr.startAllProcesses()
-
-    try:
-        while True: # Execute the processes.
-            """
-            TODO Run the processes as they should.
-            """
-            for task in taskMgr.T: # Verify tasks.
-                taskMgr.verify(task.name)
-            time.sleep(3)
-    except KeyboardInterrupt:
-        taskMgr.stopAllProcesses()
-        sys.exit(0)
+    exit(main())
