@@ -1,3 +1,7 @@
 from time import sleep
-while True:
-    sleep(1)
+
+try:
+    while True:
+        sleep(1)
+except KeyboardInterrupt:
+    pass
