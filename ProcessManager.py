@@ -1,9 +1,10 @@
 """THIS FILE IS SUBJECT TO THE LICENSE TERMS GRANTED BY THE UNIVERSITY OF SASKATCHEWAN SPACE TEAM (USST)."""
 
-import time
+import shlex
 import sys
 from subprocess import Popen
-import shlexg
+from time import sleep
+
 class RoboProcess:
     """Manages and keeps track of a process."""
 
@@ -12,10 +13,30 @@ class RoboProcess:
         self.cmd = cmd
         self.popen = None
 
-    def execute(self):
-        #Run the process's command.
-        args = shlex.split(self.cmd)
-        self.popen = Popen(args)
+    def start(self):
+        """
+        Start the process.
+
+        Ignored if process is already running.
+        """
+        if not self.popen:
+            args = shlex.split(self.cmd)
+            self.popen = Popen(args)
+
+    def stop(self):
+        """
+        Stop the process.
+
+        Ignored if the process is not running.
+        """
+        if self.popen:
+            self.popen.terminate()
+            try:
+                self.popen.wait(timeout=1)
+            except TimeoutError:
+                self.popen.kill()
+                self.popen.wait()
+            self.popen = None
 
     def status(self):
         """Return the status of a process."""
@@ -81,32 +102,27 @@ class ProcessManager:
 
         If no arguments are provided, starts all processes.
         """
+        processes = names if names else self.processes.keys()
+        for process in processes:
+            try:
+                print('Starting:', process)
+                self.processes[process].start()
+            except KeyError:
+                pass
 
-        if not name:
-            #Start all managed processes.
-            for process in self.processes:
-                self.processes[process].execute()
-        else:
-            for process in name:
-                #Start a single process.
-                print('Starting {}'.format(process))
-                self.processes[process].execute()
+    def stop(self, *names):
+        """
+        Stop processes.
 
-    def stop(self,*name):
-        if not name:
-            #Stop all managed processes.
-            print("Shutting down")
-            for process in self.processes:
-                self.processes[process].popen.kill()
-                self.processes[process].popen.wait()
-        else:
-            for process in name:
-                #Stop a process by name.
-                print("Shutting down " + name)
-                self.processes[process].popen.kill()
-                self.processes[process].popen.wait()
-
-
+        If no arguments are provided, stops all processes.
+        """
+        processes = names if names else self.processes.keys()
+        for process in processes:
+            try:
+                print('Stopping:', process)
+                self.processes[process].stop()
+            except KeyError:
+                pass
 
 
 def main():
