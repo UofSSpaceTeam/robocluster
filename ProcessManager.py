@@ -3,32 +3,30 @@
 import time
 import sys
 from subprocess import Popen
-import shlex
-
-
+import shlexg
 class RoboProcess:
-    """Manages and keeps track of a process."""
+    #Manages and keeps track of a process.
 
     def __init__(self, cmd):
-        """Initialize a process containing command cmd."""
+        #Initialize a process containing command cmd.
         self.cmd = cmd
         self.popen = None
 
     def execute(self):
-        """Run the process's command."""
+        #Run the process's command.
         args = shlex.split(self.cmd)
         self.popen = Popen(args)
 
     def status(self):
-        """Return the status of a process."""
+        #Return the status of a process.
         raise NotImplementedError()
 
     def verify(self):
-        """Verify if a process is running properly."""
+        #Verify if a process is running properly.
         raise NotImplementedError()
 
     def fix(self):
-        """Fix a process if its not running properly."""
+        #Fix a process if its not running properly.
         raise NotImplementedError()
 
 class ProcessManager:
@@ -43,7 +41,7 @@ class ProcessManager:
     """
 
     def __init__(self):
-        """Initialize a process manager."""
+        #Initialize a process manager.
         # process dictionary stores RoboProcess instances indexed
         # by the process name
         self.processes = {}
@@ -53,12 +51,12 @@ class ProcessManager:
         return self
 
     def __exit__(self, *exc):
-        """Exit context manager, makes sure all processes are stopped."""
+        #Exit context manager, makes sure all processes are stopped.
         self.stop()
         return False
 
     def isEmpty(self):
-        """Return if processes is empty."""
+        #Return if processes is empty.
         return len(self.processes) == 0
 
     def createProcess(self, name, command):
@@ -70,7 +68,7 @@ class ProcessManager:
         command - shell command for process to execute.
         """
         if name in self.processes:
-            raise ValueError(f'Process with the same name exists: {name}')
+            raise ValueError('Process with the same name exists: {name}')
 
         if not isinstance(command, str):
             raise ValueError('command must be a string')
@@ -78,7 +76,7 @@ class ProcessManager:
         self.processes[name] = RoboProcess(command)
 
 
-    def start(self,**name):
+    def start(self,*name):
         """
         Starts processes
 
@@ -86,35 +84,35 @@ class ProcessManager:
         name - name or set of names to identify process, must be unique to process manager.
         """
 
-        if name == []:
-            """Start all managed processes."""
+        if not name:
+            #Start all managed processes.
             for process in self.processes:
-                self.processes[name].execute()
+                self.processes[process].execute()
         else:
             for process in name:
-                """Start a single process."""
-                print('Starting {}'.format(name))
-                self.processes[name].execute()
+                #Start a single process.
+                print('Starting {}'.format(process))
+                self.processes[process].execute()
 
-    def stop(self,**name):
-        if name == []:
-            """Stop all managed processes."""
+    def stop(self,*name):
+        if not name:
+            #Stop all managed processes.
             print("Shutting down")
             for process in self.processes:
-                self.processes[name].popen.kill()
-                self.processes[name].popen.wait()
+                self.processes[process].popen.kill()
+                self.processes[process].popen.wait()
         else:
             for process in name:
-                """Stop a process by name."""
+                #Stop a process by name.
                 print("Shutting down " + name)
-                self.processes[name].popen.kill()
-                self.processes[name].popen.wait()
+                self.processes[process].popen.kill()
+                self.processes[process].popen.wait()
 
 
 
 
 def main():
-    """Run a process manager in the foreground."""
+    #Run a process manager in the foreground.
     process_names = [["sleep", "python sleeper.py"],
                      ["crash", "python crash.py"]]
     # Once the threading module is working fine, then we can begin connecting the proceses through 0mq.
