@@ -1,14 +1,14 @@
-# THIS FILE IS SUBJECT TO THE LICENSE TERMS GRANTED BY THE UNIVERSITY OF SASKATCHEWAN SPACE TEAM (USST).
+"""THIS FILE IS SUBJECT TO THE LICENSE TERMS GRANTED BY THE UNIVERSITY OF SASKATCHEWAN SPACE TEAM (USST)."""
 
 import time
 import sys
 from subprocess import Popen
 import shlexg
 class RoboProcess:
-    #Manages and keeps track of a process.
+    """Manages and keeps track of a process."""
 
     def __init__(self, cmd):
-        #Initialize a process containing command cmd.
+        """Initialize a process containing command cmd."""
         self.cmd = cmd
         self.popen = None
 
@@ -18,45 +18,44 @@ class RoboProcess:
         self.popen = Popen(args)
 
     def status(self):
-        #Return the status of a process.
+        """Return the status of a process."""
         raise NotImplementedError()
 
     def verify(self):
-        #Verify if a process is running properly.
+        """Verify if a process is running properly."""
         raise NotImplementedError()
 
     def fix(self):
-        #Fix a process if its not running properly.
+        """Fix a process if its not running properly."""
         raise NotImplementedError()
 
 class ProcessManager:
     """
     Manages processes that run in the robocluster framework.
 
-    Processes are just programs that can run independantly
-    from each other, in any language supported by the robocluster library.
-    The ProcessManager is in charge of starting and stopping processes,
-    and monitoring their status and handle the event of a crash
-    or a process not responding.
+    Processes are programs that can run independently from each other, in any
+    language supported by the robocluster library.
+
+    The ProcessManager is in charge of starting and stopping processes, and
+    monitoring their status and handle the event of a crash or a process not
+    responding.
     """
 
     def __init__(self):
-        #Initialize a process manager.
-        # process dictionary stores RoboProcess instances indexed
-        # by the process name
-        self.processes = {}
+        """Initialize a process manager."""
+        self.processes = {}  # store processes by name
 
     def __enter__(self):
         """Enter context manager."""
         return self
 
     def __exit__(self, *exc):
-        #Exit context manager, makes sure all processes are stopped.
+        """Exit context manager, makes sure all processes are stopped."""
         self.stop()
         return False
 
     def isEmpty(self):
-        #Return if processes is empty.
+        """Return if processes is empty."""
         return len(self.processes) == 0
 
     def createProcess(self, name, command):
@@ -76,12 +75,11 @@ class ProcessManager:
         self.processes[name] = RoboProcess(command)
 
 
-    def start(self,*name):
+    def start(self, *names):
         """
-        Starts processes
+        Start processes.
 
-        Arguments:
-        name - name or set of names to identify process, must be unique to process manager.
+        If no arguments are provided, starts all processes.
         """
 
         if not name:
@@ -112,24 +110,23 @@ class ProcessManager:
 
 
 def main():
-    #Run a process manager in the foreground.
-    process_names = [["sleep", "python sleeper.py"],
-                     ["crash", "python crash.py"]]
-    # Once the threading module is working fine, then we can begin connecting the proceses through 0mq.
+    """Run a process manager in the foreground."""
+    process_names = [
+        ["sleep", "python sleeper.py"],
+        ["crash", "python crash.py"],
+    ]
+
     with ProcessManager() as manager:
-        # Initialize all the processes
+        """Initialize all the processes"""
         for proc in process_names:
             manager.createProcess(*proc)
 
         manager.start()
 
         try:
-            while True: # Execute the processes.
-                # TODO Run the processes as they should.
-                for task in manager.processes: # Verify tasks.
-                    # taskMgr.verify(task.name)
-                    pass
-                time.sleep(3)
+            while True:
+                # TODO: Verify processes.
+                sleep(1)
         except KeyboardInterrupt:
             pass
 
