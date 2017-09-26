@@ -3,23 +3,23 @@ from time import sleep, time
 
 from rcluster import Device
 
-start = then = time()
-count = 0
+
 
 def main(args):
     address = '224.0.0.65', 22464
     device = Device(args[0], address)
     if device.name == 'reciever':
-
-        @device.on('sender/benchmark')
+        start = then = time()
+        count = 0
         def counter(data):
-            global count
-            global then
+            nonlocal count
+            nonlocal then
             count += len(data)
             now = time()
             if now - then >= 1:
                 print(count / (now - start))
                 then = now
+        device.on('sender/benchmark')(counter)
 
     elif device.name == 'sender':
         while True:
