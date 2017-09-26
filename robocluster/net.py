@@ -25,7 +25,7 @@ class Link:
     """
 
     def __init__(self, address, port):
-        _ = IPv4Address(address)
+        _ = IPv4Address(address)  # ensure ip address is valid
         if port < 1024 or port > 65535:
             raise ValueError('invalid port')
 
@@ -36,9 +36,8 @@ class Link:
         """
         Send data to an address.
 
-
-        Sends encoded data to the default address, if to is specified it will
-        send to that address instead.
+        Sends encoded data to the default address (self.address), if to is
+        specified it will send to that address instead.
         """
         if to is None:
             to, pid = self.address, None
