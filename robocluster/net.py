@@ -14,7 +14,7 @@ def pack(unpacked):
 
 def unpack(packed):
     """Unpack bytes from network."""
-    return json.loads(packed)
+    return json.loads(packed.decode())
 
 
 class Link:
