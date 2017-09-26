@@ -1,6 +1,6 @@
 from time import sleep
 
-from rcluster import Device
+from robocluster import Device
 
 device = Device('device-b', ('224.0.0.64', 22464))
 

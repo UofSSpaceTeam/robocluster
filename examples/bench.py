@@ -1,8 +1,7 @@
 import sys
 from time import sleep, time
 
-from rcluster import Device
-
+from robocluster import Device
 
 
 def main(args):

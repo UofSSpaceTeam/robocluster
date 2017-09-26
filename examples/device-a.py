@@ -1,4 +1,4 @@
-from rcluster import Device
+from robocluster import Device
 
 device = Device('device-a', ('224.0.0.64', 22464))
 
