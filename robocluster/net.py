@@ -2,13 +2,13 @@ import asyncio
 import json
 import socket
 import struct
-from ipaddress import IPv4Address
+import ipaddress
 
 
 class Socket:
     """Datagram socket wrapper with encoded transport."""
 
-    def __init__(self, address, transport='json', multicast=False, loop=None):
+    def __init__(self, address, transport='json', loop=None):
         """
         Initialize a socket.
 
@@ -33,20 +33,24 @@ class Socket:
         self._transport = transport
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._bound = False
-        self._multicast = multicast
-        if self._multicast:
-            ip_address = IPv4Address(host)
-            if not ip_address.is_multicast:
-                raise ValueError('host is not a multicast group')
 
     @property
     def buffer_size(self):
         """Return buffer size of socket."""
         return self._socket.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
 
+    @property
+    def is_multicast(self):
+        """Return True if the socket is on a multicast group."""
+        try:
+            ip_address = ipaddress.IPv4Address(self._address[0])
+            return ip_address.is_multicast
+        except ipaddress.AddressValueError:
+            return False
+
     def bind(self):
         """Bind to the socket."""
-        if self._multicast:
+        if self.is_multicast:
             mreq = struct.pack(
                 '4sl',
                 socket.inet_aton(self._address[0]),
@@ -63,7 +67,7 @@ class Socket:
 
     def send(self, data, address=None):
         """Send a packet to the network."""
-        if self._bound and self._multicast:
+        if self._bound and self.is_multicast:
             raise RuntimeError('cannot send on bound multicast socket')
 
         future = self._loop.create_future()

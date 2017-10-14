@@ -30,7 +30,6 @@ class Device:
         self._receiver = Socket(
             address,
             transport=self.transport,
-            multicast=True,
             loop=self._loop
         )
         self._receiver.bind()
