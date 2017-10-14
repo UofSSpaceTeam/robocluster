@@ -1,13 +1,13 @@
 from robocluster import Device
 
-device = Device('device-a', ('224.0.0.64', 22464))
+device = Device('device-a', '224.0.0.64:32464')
 
 @device.on('device-b/hello')
-def hello_1(data):
-    print('first handler for device-b/hello:', data)
+async def hello(event, data):
+    print(event, data)
 
-@device.on('device-b/hello')
-def hello_2(data):
-    print('second handler for device-b/hello:', data)
+@device.on('device-b/every')
+async def every(event, data):
+    print(event, data)
 
-device.run()
+device.run_forever()
