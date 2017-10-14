@@ -17,8 +17,6 @@ class Socket:
             transport (str, optional): Transport type to use.
                 Supported values: 'raw', 'utf-8', and 'json'
                 Defaults to 'json'.
-            multicast (bool, optional): If the socket used for multicast.
-                Defaults to False.
             loop (optional): Event loop to use.
                 Defaults to current event loop.
         """
