@@ -4,8 +4,19 @@ import asyncio
 from collections import defaultdict
 from contextlib import suppress
 from functools import wraps
+from inspect import iscoroutinefunction
 
 from .net import Socket
+
+
+def as_coroutine(func):
+    @wraps(func)
+    async def _wrapper(*args, **kwargs):
+        func(*args, *kwargs)
+    if iscoroutinefunction(func):
+        return func
+    else:
+        return _wrapper
 
 
 class Device:
@@ -45,13 +56,15 @@ class Device:
     def on(self, event):
         """Add a callback for an event."""
         def _decorator(callback):
-            self.events[event].append(callback)
+            coro = as_coroutine(callback)
+            self.events[event].append(coro)
             return callback
         return _decorator
 
     def task(self, task):
         """Create a background task."""
-        self._loop.create_task(task())
+        coro = as_coroutine(task)
+        self._loop.create_task(coro())
         return task
 
     def every(self, duration):
@@ -60,7 +73,8 @@ class Device:
             @wraps(func)
             async def _wrapper():
                 while True:
-                    await func()
+                    coro = as_coroutine(func)
+                    await coro()
                     await self.sleep(duration)
             self.task(_wrapper)
             return func
