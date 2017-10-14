@@ -15,7 +15,7 @@ class Socket:
         Args:
             address (str): Address in form 'host:port'
             transport (str, optional): Transport type to use.
-                Supported values: 'raw', 'utf-8', and 'json'
+                Supported values: 'raw', 'utf-8', 'json', and 'msgpack'
                 Defaults to 'json'.
             loop (optional): Event loop to use.
                 Defaults to current event loop.
@@ -131,6 +131,13 @@ class Socket:
         if self._transport == 'json':
             return json.dumps(data).encode()
 
+        if self._transport == 'msgpack':
+            try:
+                import msgpack
+                return msgpack.packb(data)
+            except ImportError:
+                pass
+
         raise RuntimeError('transport type not supported')
 
     def decode(self, data):
@@ -143,5 +150,12 @@ class Socket:
 
         if self._transport == 'json':
             return json.loads(data.decode())
+
+        if self._transport == 'msgpack':
+            try:
+                import msgpack
+                return msgpack.unpackb(data, encoding='utf-8')
+            except ImportError:
+                pass
 
         raise RuntimeError('transport type not supported')
