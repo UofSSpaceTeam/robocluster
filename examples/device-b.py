@@ -11,7 +11,7 @@ async def hello():
         await device.publish('hello', message)
         await device.sleep(1)
 
-@device.every(1)
+@device.every('100ms')
 async def every():
     await device.publish('every', time())
 

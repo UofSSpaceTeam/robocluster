@@ -7,6 +7,7 @@ from functools import wraps
 from inspect import iscoroutinefunction
 
 from .net import Socket
+from .util import duration_to_seconds
 
 
 def as_coroutine(func):
@@ -81,8 +82,9 @@ class Device:
         return _decorator
 
     @staticmethod
-    def sleep(seconds):
+    def sleep(duration):
         """Sleep the device."""
+        seconds = duration_to_seconds(duration)
         return asyncio.sleep(seconds)
 
     async def _send_task(self):
