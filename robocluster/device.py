@@ -11,9 +11,16 @@ from .util import duration_to_seconds
 
 
 def as_coroutine(func):
+    """
+    Convert a function to a coroutine that can be awaited.
+
+    Notes:
+    If the function is already a coroutine, it is returned directly.
+    """
     @wraps(func)
     async def _wrapper(*args, **kwargs):
         func(*args, *kwargs)
+
     if iscoroutinefunction(func):
         return func
     else:
