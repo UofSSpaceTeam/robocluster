@@ -37,7 +37,7 @@ class Device:
         self.name = name
         self.events = defaultdict(list)
 
-        self._loop = loop if loop else asyncio.get_event_loop()
+        self._loop = loop if loop else asyncio.new_event_loop()
 
         self._sender = Socket(
             address,
@@ -92,7 +92,7 @@ class Device:
     def sleep(duration):
         """Sleep the device."""
         seconds = duration_to_seconds(duration)
-        return asyncio.sleep(seconds)
+        return asyncio.sleep(seconds, loop=self._loop)
 
     async def _send_task(self):
         """Send packets in the send queue."""
