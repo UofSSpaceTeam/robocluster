@@ -88,8 +88,7 @@ class Device:
             return func
         return _decorator
 
-    @staticmethod
-    def sleep(duration):
+    def sleep(self, duration):
         """Sleep the device."""
         seconds = duration_to_seconds(duration)
         return asyncio.sleep(seconds, loop=self._loop)
