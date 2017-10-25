@@ -1,6 +1,6 @@
 from robocluster import Device
 
-device = Device('device-a', '224.0.0.64:32464')
+device = Device('device-a', 'demo-device')
 
 @device.on('device-b/hello')
 def hello(event, data):

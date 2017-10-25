@@ -6,7 +6,7 @@ from contextlib import suppress
 from functools import wraps
 from inspect import iscoroutinefunction
 
-from .net import Socket
+from .net import Socket, key_to_multicast
 from .util import duration_to_seconds
 
 
@@ -32,10 +32,12 @@ class Device:
 
     transport = 'json'
 
-    def __init__(self, name, address, loop=None):
+    def __init__(self, name, group, loop=None):
         """Initialize the device."""
         self.name = name
         self.events = defaultdict(list)
+
+        address = key_to_multicast(group)
 
         self._loop = loop if loop else asyncio.new_event_loop()
 

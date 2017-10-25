@@ -3,6 +3,7 @@ import json
 import socket
 import struct
 import ipaddress
+from hashlib import sha256
 
 
 class Socket:
@@ -159,3 +160,25 @@ class Socket:
                 pass
 
         raise RuntimeError('transport type not supported')
+
+
+def key_to_multicast(key):
+    """Convert a key to a local multicast group."""
+    digest = sha256(key.encode()).digest()
+
+    # grab 1 byte for last octet of IP
+    group = digest[0:1]
+    # grab 2 bytes for port
+    port = digest[1:3]
+
+    group, port = map(
+        lambda b: int.from_bytes(b, byteorder='little'),
+        [group, port]
+    )
+
+    # mask bits 15 and 16 to make port ephemeral (49152-65535)
+    port |= 0xC000
+
+    # RFC 5771 states that IP multicast range of 224.0.0.0 to 224.0.0.255
+    # are for use in local subnetworks.
+    return '224.0.0.{}:{}'.format(group, port)

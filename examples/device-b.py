@@ -2,7 +2,7 @@ from time import sleep, time
 
 from robocluster import Device
 
-device = Device('device-b', '224.0.0.64:32464')
+device = Device('device-b', 'demo-device')
 
 @device.task
 async def hello():
