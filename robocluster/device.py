@@ -17,6 +17,7 @@ def as_coroutine(func):
 
     Notes:
     If the function is already a coroutine, it is returned directly.
+
     """
     @wraps(func)
     async def _wrapper(*args, **kwargs):

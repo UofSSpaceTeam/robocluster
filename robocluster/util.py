@@ -17,6 +17,7 @@ def duration_to_seconds(duration):
         - 'm', 'minute', 'minutes': 60 seconds
         - 's', 'second', 'seconds': 1 seconds
         - 'ms', 'millisecond', 'milliseconds': 0.001 seconds
+
     """
     if isinstance(duration, (float, int)):
         return duration
