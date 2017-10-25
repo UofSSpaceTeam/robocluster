@@ -10,4 +10,4 @@ def hello(event, data):
 def every(event, data):
     print(event, data)
 
-device.run_forever()
+device.run()

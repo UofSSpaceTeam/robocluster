@@ -15,4 +15,4 @@ async def hello():
 async def every():
     await device.publish('every', time())
 
-device.run_forever()
+device.run()

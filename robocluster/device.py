@@ -5,6 +5,7 @@ from collections import defaultdict
 from contextlib import suppress
 from functools import wraps
 from inspect import iscoroutinefunction
+from threading import Thread
 
 from .net import Socket, key_to_multicast
 from .util import duration_to_seconds
@@ -38,6 +39,7 @@ class Device:
 
         address = key_to_multicast(group)
 
+        self._thread = None
         self._loop = loop if loop else asyncio.new_event_loop()
 
         self._sender = Socket(
@@ -108,19 +110,45 @@ class Device:
             for callback in self.events[event]:
                 self._loop.create_task(callback(event, data))
 
-    def run_forever(self):
-        """Run device in foreground forever."""
+    def start(self):
+        """Start device."""
+        if self._thread:
+            raise RuntimeError('device already running')
+        self._thread = Thread(target=self._thread_target)
+        self._thread.start()
+
+    def _thread_target(self):
+        """Target for thread to run event loop in background."""
+        loop = self._loop
+        asyncio.set_event_loop(loop)
+
+        loop.create_task(self._send_task())
+        loop.create_task(self._receive_task())
+        loop.run_forever()
+
+        for task in asyncio.Task.all_tasks(loop=loop):
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                loop.run_until_complete(task)
+
+    def run(self):
+        """Run device in foreground."""
         try:
-            self._loop.create_task(self._send_task())
-            self._loop.create_task(self._receive_task())
-            self._loop.run_forever()
+            self.start()
+            self.wait()
         except KeyboardInterrupt:
             self.stop()
+            raise
+
+    def wait(self):
+        """Wait until device exits."""
+        if self._thread:
+            self._thread.join()
 
     def stop(self):
         """Stop running device."""
-        self._loop.stop()
-        for task in asyncio.Task.all_tasks(loop=self._loop):
-            task.cancel()
-            with suppress(asyncio.CancelledError):
-                self._loop.run_until_complete(task)
+        if not self._thread:
+            raise RuntimeError('device not running')
+        self._loop.call_soon_threadsafe(self._loop.stop)
+        self._thread.join()
+        self._thread = None
