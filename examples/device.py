@@ -10,17 +10,17 @@ group = str(uuid4())
 device_a = Device('device-a', group)
 
 @device_a.on('device-b/hello')
-def hello(event, data):
+def hello_a(event, data):
     print(event, data)
 
 @device_a.on('device-b/every')
-def every(event, data):
+def every_a(event, data):
     print(event, data)
 
 device_b = Device('device-b', group)
 
 @device_b.task
-async def hello():
+async def hello_b():
     counter = count()
     message = 'Hello World {}!'
     while True:
@@ -28,7 +28,7 @@ async def hello():
         await device_b.sleep(1)
 
 @device_b.every('100ms')
-async def every():
+async def every_b():
     await device_b.publish('every', time())
 
 try:
