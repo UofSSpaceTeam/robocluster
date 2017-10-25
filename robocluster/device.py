@@ -23,8 +23,7 @@ def as_coroutine(func):
 
     if iscoroutinefunction(func):
         return func
-    else:
-        return _wrapper
+    return _wrapper
 
 
 class Device:

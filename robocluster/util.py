@@ -18,7 +18,7 @@ def duration_to_seconds(duration):
         - 's', 'second', 'seconds': 1 seconds
         - 'ms', 'millisecond', 'milliseconds': 0.001 seconds
     """
-    if isinstance(duration, int) or isinstance(duration, float):
+    if isinstance(duration, (float, int)):
         return duration
 
     value = -1.0

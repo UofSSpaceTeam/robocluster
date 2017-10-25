@@ -107,7 +107,7 @@ class Socket:
 
     def close(self):
         """Close the socket."""
-        if self._multicast:
+        if self.is_multicast:
             mreq = struct.pack(
                 '4sl',
                 socket.inet_aton(self._address[0]),
