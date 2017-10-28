@@ -1,2 +1,1 @@
-def request(uri):
-    raise NotImplementedError()
+from .device import Device

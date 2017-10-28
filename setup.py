@@ -8,8 +8,6 @@ setup(name='robocluster',
       author_email='software@usst.ca',
       license='ECL-2.0',
       packages=['robocluster'],
-      install_requires=[
-          'pyzmq',
-      ],
+      install_requires=[],
       zip_safe=False)
 
