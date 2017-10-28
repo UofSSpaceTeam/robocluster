@@ -10,6 +10,8 @@ Welcome to robocluster's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   robocluster
+
 
 
 Indices and tables
