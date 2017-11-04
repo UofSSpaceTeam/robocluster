@@ -61,7 +61,12 @@ class Socket:
                 mreq
             )
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self._socket.bind(self._address)
+
+        ip, port = self._address
+        if self.is_multicast:
+            ip = ''
+        self._socket.bind((ip, port))
+
         self._bound = True
 
     def send(self, data, address=None):
