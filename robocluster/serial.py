@@ -11,13 +11,13 @@ class SerialDevice:
     with the robocluster network.
     """
 
-    def __init__(self, usbpath, pktformat='json', loop=None):
+    def __init__(self, usbpath, baudrate=BAUDRATE, pktformat='json', loop=None):
         self._loop = loop if loop else asyncio.get_event_loop()
         self._format = pktformat
         self._reader = None  # once initialized, an asyncio.StreamReader
         self._writer = None  # once initialized, an asyncio.StreamWriter
         self._usbpath = usbpath
-        self._baudrate = BAUDRATE
+        self._baudrate = baudrate
         self._loop.create_task(self.init_serial())
 
 
@@ -31,12 +31,11 @@ class SerialDevice:
         """Checks if the StreamReader and StreamWriter are initialized"""
         return self._reader and self._writer
 
-    async def read_byte(self):
+    def read_byte(self):
         """Read a single byte from the serial device"""
         if not self._reader:
             raise RuntimeError("Serial reader not initialized yet")
-        b = await self._reader.read(1)
-        return b
+        return self._reader.read(1)
 
     async def read_packet(self):
         """

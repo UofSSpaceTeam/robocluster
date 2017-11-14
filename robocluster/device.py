@@ -134,7 +134,7 @@ class Device:
         self._serial_device = serialdevice
         self._serial_device._loop = self._loop
         # Reinitialize the connection with the new event loop
-        self._loop.create_task(self._serial_device.init_serial())
+        self._loop.call_soon_threadsafe(self._serial_device.init_serial())
 
     def create_serial(self, usbpath):
         """Create a new SerialDevice that is integrated with the callback system"""
