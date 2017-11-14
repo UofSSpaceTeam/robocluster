@@ -1,16 +1,28 @@
-from robocluster.serial import SerialDevice
-import asyncio
+from robocluster import Device
 
 
-device  = SerialDevice('/dev/ttyACM0')
+device = Device('link', 'rover')
+device.create_serial('/dev/ttyACM0')
 
-async def read_data():
-    while not device.isInitialized():
-        asyncio.sleep(0.01)
 
-    msg = await device.read_packet()
-    print(msg)
+@device.on('test')
+async def callback(event, data):
+    print(event, data)
 
-loop = asyncio.get_event_loop()
+device.run()
 
-loop.run_until_complete(read_data())
+# Alternative method of serial device creation
+# from robocluster import SerialDevice
+# import asyncio
+# sDevice = SerialDevice('/dev/ttyACM0')
+# device.link_serial(sDevice)
+
+# async def serial_read():
+#     while not sDevice.isInitialized():
+#         asyncio.sleep(0.01)
+#     while True:
+#         msg = await sDevice.read_packet()
+#         print(msg)
+
+# loop = asyncio.get_event_loop()
+# loop.run_until_complete(serial_read())

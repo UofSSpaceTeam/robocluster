@@ -9,6 +9,7 @@ from threading import Thread
 
 from .net import Socket, key_to_multicast
 from .util import duration_to_seconds
+from .serial import SerialDevice
 
 
 def as_coroutine(func):
@@ -56,6 +57,8 @@ class Device:
             loop=self._loop
         )
         self._receiver.bind()
+
+        self._serial_device = None
 
     def publish(self, topic, data):
         """Publish to topic."""
@@ -111,6 +114,32 @@ class Device:
             for callback in self.events[event]:
                 self._loop.create_task(callback(event, data))
 
+    async def _serial_read_task(self):
+        """
+        Recieve packets from a linked serial device
+        and call the appropriate callbacks.
+        """
+        while not self._serial_device.isInitialized():
+            await self.sleep(0.01)  # Better way to do this?
+        while True:
+            packet = await self._serial_device.read_packet()
+            event, data = packet['event'], packet['data']
+            for callback in self.events[event]:
+                self._loop.create_task(callback(event, data))
+
+    def link_serial(self, serialdevice):
+        """Integrate an existing serial device I/O for pub/sub communication."""
+        if serialdevice._format not in ['json']:
+            raise RuntimeError('Only json devices are supported at this time')
+        self._serial_device = serialdevice
+        self._serial_device._loop = self._loop
+        # Reinitialize the connection with the new event loop
+        self._loop.create_task(self._serial_device.init_serial())
+
+    def create_serial(self, usbpath):
+        """Create a new SerialDevice that is integrated with the callback system"""
+        self._serial_device = SerialDevice(usbpath, loop=self._loop)
+
     def start(self):
         """Start device."""
         if self._thread:
@@ -125,6 +154,8 @@ class Device:
 
         loop.create_task(self._send_task())
         loop.create_task(self._receive_task())
+        if self._serial_device:
+            self._loop.create_task(self._serial_read_task())
         loop.run_forever()
 
         for task in asyncio.Task.all_tasks(loop=loop):
