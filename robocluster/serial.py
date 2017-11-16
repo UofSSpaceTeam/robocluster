@@ -45,15 +45,28 @@ class SerialDevice:
         return self._reader.read(1)
 
     async def read_packet(self):
-        """
-        Read a json packet from the serial device.
-        Assumes the packet is a single dictionary and there
-        are no nested dictionaries.
-        """
+        """Read a json packet from the serial device."""
         if not self._reader:
             raise RuntimeError("Serial reader not initialized yet")
         if self._format == 'json':
-            pkt = await self._reader.readuntil(b'}')
+            pkt = ''
+            curleystack = 0
+            squarestack = 0
+            done_reading = False
+            while not done_reading:
+                b = await self._reader.read(1)
+                b = b.decode()
+                if b == '{':
+                    curleystack += 1
+                elif b == '}':
+                    curleystack -= 1
+                elif b == '[':
+                    squarestack += 1
+                elif b == ']':
+                    squarestack -= 1
+                pkt += b
+                if curleystack == 0 and squarestack == 0:
+                    done_reading = True
             return json.loads(pkt)
 
         raise RuntimeError('Packet format type not supported')
