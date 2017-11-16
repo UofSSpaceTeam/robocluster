@@ -100,14 +100,13 @@ class Device:
         Recieve packets from a linked serial device
         and call the appropriate callbacks.
         """
-        while not self._serial_device.isInitialized():
-            await self.sleep(0.01)  # Better way to do this?
-        while True:
-            packet = await self._serial_device.read_packet()
-            event, data = packet['event'], packet['data']
-            if event in self._serial_device.events:
-                for callback in self._serial_device.events[event]:
-                    self._loop.create_task(callback(event, data))
+        async with self._serial_device as ser:
+            while True:
+                packet = await ser.read_packet()
+                event, data = packet['event'], packet['data']
+                if event in ser.events:
+                    for callback in ser.events[event]:
+                        self._loop.create_task(callback(event, data))
 
     def link_serial(self, serialdevice):
         """Integrate an existing serial device I/O for pub/sub communication."""
@@ -115,8 +114,6 @@ class Device:
             raise RuntimeError('Only json devices are supported at this time')
         self._serial_device = serialdevice
         self._serial_device._loop = self._loop
-        # Reinitialize the connection with the new event loop
-        self._loop.call_soon_threadsafe(self._serial_device.init_serial())
 
     def create_serial(self, usbpath):
         """Create a new SerialDevice that is integrated with the callback system"""

@@ -13,14 +13,14 @@ device.run()
 # Alternative method of serial device creation
 # from robocluster import SerialDevice
 # import asyncio
+# sDevice = SerialDevice('/dev/ttyACM0')
 # device.link_serial(sDevice)
 
 # async def serial_read():
-#     while not sDevice.isInitialized():
-#         asyncio.sleep(0.01)
-#     while True:
-#         msg = await sDevice.read_packet()
-#         print(msg)
-
+#     async with sDevice as ser:
+#         while True:
+#             msg = await ser.read_packet()
+#             print(msg)
+#
 # loop = asyncio.get_event_loop()
 # loop.run_until_complete(serial_read())

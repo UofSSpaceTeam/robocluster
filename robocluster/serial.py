@@ -22,15 +22,17 @@ class SerialDevice:
         self._usbpath = usbpath
         self._baudrate = baudrate
         self.events = defaultdict(list)
-        self._loop.create_task(self.init_serial())
 
-
-    async def init_serial(self):
-        """Initialize the StreamReader and StreamWriter."""
+    async def __aenter__(self):
+        """Enter context manager and initialize the StreamReader and StreamWriter."""
         self._reader, self._writer = await serial_asyncio.open_serial_connection(
                 loop=self._loop,
                 url=self._usbpath,
                 baudrate=self._baudrate)
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        pass
 
     def isInitialized(self):
         """Checks if the StreamReader and StreamWriter are initialized"""
