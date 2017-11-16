@@ -1,6 +1,9 @@
 import serial_asyncio
 import asyncio
 import json
+from collections import defaultdict
+
+from .util import as_coroutine
 
 BAUDRATE = 115200
 
@@ -18,12 +21,14 @@ class SerialDevice:
         self._writer = None  # once initialized, an asyncio.StreamWriter
         self._usbpath = usbpath
         self._baudrate = baudrate
+        self.events = defaultdict(list)
         self._loop.create_task(self.init_serial())
 
 
     async def init_serial(self):
         """Initialize the StreamReader and StreamWriter."""
         self._reader, self._writer = await serial_asyncio.open_serial_connection(
+                loop=self._loop,
                 url=self._usbpath,
                 baudrate=self._baudrate)
 
@@ -50,3 +55,11 @@ class SerialDevice:
             return json.loads(pkt)
 
         raise RuntimeError('Packet format type not supported')
+
+    def on(self, event):
+        """Add a callback for an event."""
+        def _decorator(callback):
+            coro = as_coroutine(callback)
+            self.events[event].append(coro)
+            return callback
+        return _decorator

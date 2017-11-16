@@ -3,30 +3,11 @@
 import asyncio
 from collections import defaultdict
 from contextlib import suppress
-from functools import wraps
-from inspect import iscoroutinefunction
 from threading import Thread
 
 from .net import Socket, key_to_multicast
-from .util import duration_to_seconds
+from .util import duration_to_seconds, as_coroutine
 from .serial import SerialDevice
-
-
-def as_coroutine(func):
-    """
-    Convert a function to a coroutine that can be awaited.
-
-    Notes:
-    If the function is already a coroutine, it is returned directly.
-
-    """
-    @wraps(func)
-    async def _wrapper(*args, **kwargs):
-        func(*args, *kwargs)
-
-    if iscoroutinefunction(func):
-        return func
-    return _wrapper
 
 
 class Device:
@@ -124,8 +105,9 @@ class Device:
         while True:
             packet = await self._serial_device.read_packet()
             event, data = packet['event'], packet['data']
-            for callback in self.events[event]:
-                self._loop.create_task(callback(event, data))
+            if event in self._serial_device.events:
+                for callback in self._serial_device.events[event]:
+                    self._loop.create_task(callback(event, data))
 
     def link_serial(self, serialdevice):
         """Integrate an existing serial device I/O for pub/sub communication."""
@@ -139,6 +121,7 @@ class Device:
     def create_serial(self, usbpath):
         """Create a new SerialDevice that is integrated with the callback system"""
         self._serial_device = SerialDevice(usbpath, loop=self._loop)
+        return self._serial_device
 
     def start(self):
         """Start device."""

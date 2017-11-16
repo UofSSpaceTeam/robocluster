@@ -1,6 +1,24 @@
 """Utility functions for robocluster."""
 
 import re
+from functools import wraps
+from inspect import iscoroutinefunction
+
+def as_coroutine(func):
+    """
+    Convert a function to a coroutine that can be awaited.
+
+    Notes:
+    If the function is already a coroutine, it is returned directly.
+
+    """
+    @wraps(func)
+    async def _wrapper(*args, **kwargs):
+        func(*args, *kwargs)
+
+    if iscoroutinefunction(func):
+        return func
+    return _wrapper
 
 
 def duration_to_seconds(duration):

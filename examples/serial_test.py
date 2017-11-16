@@ -2,10 +2,9 @@ from robocluster import Device
 
 
 device = Device('link', 'rover')
-device.create_serial('/dev/ttyACM0')
+sDevice = device.create_serial('/dev/ttyACM0')
 
-
-@device.on('test')
+@sDevice.on('test')
 async def callback(event, data):
     print(event, data)
 
@@ -14,7 +13,6 @@ device.run()
 # Alternative method of serial device creation
 # from robocluster import SerialDevice
 # import asyncio
-# sDevice = SerialDevice('/dev/ttyACM0')
 # device.link_serial(sDevice)
 
 # async def serial_read():
