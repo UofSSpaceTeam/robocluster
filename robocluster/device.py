@@ -39,7 +39,7 @@ class Device:
         )
         self._receiver.bind()
 
-        self._serial_device = None
+        self._serial_device = {}
 
     def publish(self, topic, data):
         """Publish to topic."""
@@ -95,12 +95,12 @@ class Device:
             for callback in self.events[event]:
                 self._loop.create_task(callback(event, data))
 
-    async def _serial_read_task(self):
+    async def _serial_read_task(self, serialdevice):
         """
         Recieve packets from a linked serial device
         and call the appropriate callbacks.
         """
-        async with self._serial_device as ser:
+        async with serialdevice as ser:
             while True:
                 packet = await ser.read_packet()
                 event, data = packet['event'], packet['data']
@@ -110,14 +110,12 @@ class Device:
 
     def link_serial(self, serialdevice):
         """Integrate an existing serial device I/O for pub/sub communication."""
-        if serialdevice._format not in ['json']:
-            raise RuntimeError('Only json devices are supported at this time')
-        self._serial_device = serialdevice
-        self._serial_device._loop = self._loop
+        self._serial_device[serialdevice._usbpath] = serialdevice
+        self._serial_device[serialdevice._usbpath]._loop = self._loop
 
     def create_serial(self, usbpath):
         """Create a new SerialDevice that is integrated with the callback system"""
-        self._serial_device = SerialDevice(usbpath, loop=self._loop)
+        self._serial_device[usbpath] = SerialDevice(usbpath, loop=self._loop)
         return self._serial_device
 
     def start(self):
@@ -134,8 +132,8 @@ class Device:
 
         loop.create_task(self._send_task())
         loop.create_task(self._receive_task())
-        if self._serial_device:
-            self._loop.create_task(self._serial_read_task())
+        for serialdevice in self._serial_device:
+            self._loop.create_task(self._serial_read_task(serialdevice))
         loop.run_forever()
 
         for task in asyncio.Task.all_tasks(loop=loop):
