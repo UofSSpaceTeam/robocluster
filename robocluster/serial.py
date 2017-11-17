@@ -71,6 +71,18 @@ class SerialDevice:
 
         raise RuntimeError('Packet format type not supported')
 
+    async def write_packet(self, data_object):
+        """Write a packet (or bytes) to the serial device"""
+        if not self._writer:
+            raise RuntimeError("Serial writer not initialized yet")
+        if self._format == 'raw':
+            return self._writer.write(data_object)
+        elif self._format == 'utf8':
+            return self._writer.write(data_object.encode())
+        elif self._format == 'json':
+            return self._writer.write(json.dumps(data_object).encode())
+        raise RuntimeError('Packet format type not supported')
+
     def on(self, event):
         """Add a callback for an event."""
         def _decorator(callback):
