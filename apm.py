@@ -17,7 +17,7 @@ class ProcessDefinition:
     _released = False
 
     def __new__(cls, *more, **kwargs):
-        instance = super().__new__(cls, *more)
+        instance = super().__new__(cls)
         instance.__dict__.update({ k: v for k, v in cls.__dict__.items() if not k.startswith('_') })
         return instance
 
