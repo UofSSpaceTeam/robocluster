@@ -23,6 +23,12 @@ class SerialDevice:
         self._baudrate = baudrate
         self.events = defaultdict(list)
 
+    def __str__(self):
+        """String representation of a SerialDevice"""
+        return 'SerialDevice(usbpath={}, baudrate={}, pktformat={})'.format(
+                self._usbpath, self._baudrate, self._format
+                )
+
     async def __aenter__(self):
         """Enter context manager and initialize the StreamReader and StreamWriter."""
         self._reader, self._writer = await serial_asyncio.open_serial_connection(

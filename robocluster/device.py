@@ -116,7 +116,7 @@ class Device:
     def create_serial(self, usbpath):
         """Create a new SerialDevice that is integrated with the callback system"""
         self._serial_device[usbpath] = SerialDevice(usbpath, loop=self._loop)
-        return self._serial_device
+        return self._serial_device[usbpath]
 
     def start(self):
         """Start device."""
@@ -132,7 +132,7 @@ class Device:
 
         loop.create_task(self._send_task())
         loop.create_task(self._receive_task())
-        for serialdevice in self._serial_device:
+        for serialdevice in self._serial_device.values():
             self._loop.create_task(self._serial_read_task(serialdevice))
         loop.run_forever()
 
