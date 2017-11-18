@@ -74,6 +74,19 @@ class SerialDevice:
                 if curleystack == 0 and squarestack == 0:
                     done_reading = True
             return json.loads(pkt)
+        elif self._format == 'vesc':
+            import pyvesc
+            # Taken from Roveberrypy
+            to_int = lambda b: int.from_bytes(b, byteorder='big')
+            head = await self._reader.read(1)
+            # magic VESC header must be 2 or 3
+            if not to_int(head) == 2 or to_int(head) == 3:
+                return None # raise error maybe?
+            length = await self._reader.read(to_int(head) - 1)
+            packet = head + length + await self._reader.read(to_int(length) + 4)
+            msg, _ = pyvesc.decode(packet)
+            return {'event': msg.__class__.__name__,
+                    'data': msg}
 
         raise RuntimeError('Packet format type not supported')
 
@@ -87,6 +100,9 @@ class SerialDevice:
             return self._writer.write(data_object.encode())
         elif self._format == 'json':
             return self._writer.write(json.dumps(data_object).encode())
+        elif self._format == 'vesc':
+            import pyvesc
+            return self._writer.write(pyvesc.encode(data_object))
         raise RuntimeError('Packet format type not supported')
 
     def on(self, event):

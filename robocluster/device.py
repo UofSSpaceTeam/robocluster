@@ -113,9 +113,10 @@ class Device:
         self._serial_device[serialdevice._usbpath] = serialdevice
         self._serial_device[serialdevice._usbpath]._loop = self._loop
 
-    def create_serial(self, usbpath):
+    def create_serial(self, usbpath, pktformat='json'):
         """Create a new SerialDevice that is integrated with the callback system"""
-        self._serial_device[usbpath] = SerialDevice(usbpath, loop=self._loop)
+        self._serial_device[usbpath] = SerialDevice(
+                usbpath, pktformat=pktformat, loop=self._loop)
         return self._serial_device[usbpath]
 
     def start(self):
