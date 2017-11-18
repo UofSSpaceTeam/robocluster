@@ -8,12 +8,15 @@ from subprocess import Popen
 from time import sleep
 
 log = logging.getLogger("Process-Manager")
+log.setLevel(logging.INFO)
 
 class RoboProcess:
     """Manages and keeps track of a process."""
 
     def __init__(self, name, cmd):
         """Initialize a process containing command cmd."""
+        if not isinstance(cmd, str):
+            raise ValueError('command must be a string')
         self.name = name
         self.cmd = cmd
         self.pid = None
@@ -86,8 +89,21 @@ class RoboProcess:
 
     def on_exit(self, returncode):
         """To be called when the process exits"""
-        if returncode == 0:
+        raise NotImplementedError('RoboProcess does not define a default behaivior on exit. Please inherit and define the on_exit(returncode) method')
+
+class RunOnce(RoboProcess):
+    """Process that runs """
+    def on_exit(self, returncode):
+        self.process = None
+
+class RestartOnCrash(RoboProcess):
+    """Process that restarts on non zero exit"""
+    def on_exit(self, returncode):
+        if returncode != 0:
+            self.restart()
+        else:
             self.process = None
+
 
 class ProcessManager:
     """
@@ -127,13 +143,13 @@ class ProcessManager:
         name    - name to identify process, must be unique to process manager.
         command - shell command for process to execute.
         """
-        if name in self.processes:
+        self.addProcess(RoboProcess(name, command))
+
+    def addProcess(self, roboprocess):
+        """Adds roboprocess that was created externally to the manager"""
+        if roboprocess.name in self.processes:
             raise ValueError('Process with the same name exists: {name}')
-
-        if not isinstance(command, str):
-            raise ValueError('command must be a string')
-
-        self.processes[name] = RoboProcess(name, command)
+        self.processes[roboprocess.name] = roboprocess
 
 
     def start(self, *names):
@@ -174,15 +190,17 @@ class ProcessManager:
 
 def main():
     """Run a process manager in the foreground."""
-    process_names = [
-        ["sleep", "python sleeper.py"],
-        ["printer", "python ./examples/processes/print_periodically.py 1 4"],
+    process_list = [
+        RunOnce('sleep', 'python sleeper.py'),
+        RunOnce("printer", "python ./examples/processes/print_periodically.py 1 4"),
+        RunOnce("terminal", 'termite'),
+        # RestartOnCrash('crasher', 'python crash.py')
     ]
 
     with ProcessManager() as manager:
         """Initialize all the processes"""
-        for proc in process_names:
-            manager.createProcess(*proc)
+        for proc in process_list:
+            manager.addProcess(proc)
 
         manager.start()
 
@@ -190,15 +208,6 @@ def main():
             manager.run()
         except KeyboardInterrupt:
             pass
-
-def amain():
-    p1 = RoboProcess('lister', 'ls')
-    p2 = RoboProcess('printer', 'python ./examples/processes/print_periodically.py 1 3')
-    loop = asyncio.get_event_loop()
-    try:
-        loop.run_until_complete(p2.run())
-    except KeyboardInterrupt:
-        p1.kill(release=True)
 
 if __name__ == "__main__":
     exit(main())
