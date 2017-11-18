@@ -7,7 +7,7 @@ import logging
 from subprocess import Popen
 from time import sleep
 
-log = logging.getLogger()
+log = logging.getLogger("Process-Manager")
 
 class RoboProcess:
     """Manages and keeps track of a process."""
@@ -104,6 +104,7 @@ class ProcessManager:
     def __init__(self):
         """Initialize a process manager."""
         self.processes = {}  # store processes by name
+        self._futures = []
 
     def __enter__(self):
         """Enter context manager."""
@@ -132,7 +133,7 @@ class ProcessManager:
         if not isinstance(command, str):
             raise ValueError('command must be a string')
 
-        self.processes[name] = RoboProcess(command)
+        self.processes[name] = RoboProcess(name, command)
 
 
     def start(self, *names):
@@ -145,11 +146,12 @@ class ProcessManager:
         for process in processes:
             try:
                 print('Starting:', process)
-                self.processes[process].start()
+                self._futures.append(asyncio.ensure_future(
+                    self.processes[process].run()))
             except KeyError:
                 pass
 
-    def stop(self, *names):
+    def stop(self, *names, timeout=0):
         """
         Stop processes.
 
@@ -159,16 +161,22 @@ class ProcessManager:
         for process in processes:
             try:
                 print('Stopping:', process)
-                self.processes[process].stop()
+                asyncio.ensure_future(
+                        self.processes[process].kill(timeout=timeout, release=True))
             except KeyError:
                 pass
+
+    def run(self):
+        """Run the event loop"""
+        loop = asyncio.get_event_loop()
+        loop.run_forever()
 
 
 def main():
     """Run a process manager in the foreground."""
     process_names = [
         ["sleep", "python sleeper.py"],
-        ["crash", "python crash.py"],
+        ["printer", "python ./examples/processes/print_periodically.py 1 4"],
     ]
 
     with ProcessManager() as manager:
@@ -179,9 +187,7 @@ def main():
         manager.start()
 
         try:
-            while True:
-                # TODO: Verify processes.
-                sleep(1)
+            manager.run()
         except KeyboardInterrupt:
             pass
 
@@ -195,4 +201,4 @@ def amain():
         p1.kill(release=True)
 
 if __name__ == "__main__":
-    exit(amain())
+    exit(main())
