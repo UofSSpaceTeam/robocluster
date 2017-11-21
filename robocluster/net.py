@@ -65,6 +65,7 @@ class Socket:
 
         ip, port = self._address
         if self.is_multicast and os.name == 'nt':
+            # Windows does not support bind on a specific multicast ip
             ip = ''
         self._socket.bind((ip, port))
 
