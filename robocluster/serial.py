@@ -1,3 +1,4 @@
+'''Handles comunication to serial devices'''
 import serial_asyncio
 import asyncio
 import json

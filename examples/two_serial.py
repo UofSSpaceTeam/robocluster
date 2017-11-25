@@ -11,12 +11,12 @@ print(micro)
 print(teensy)
 
 @micro.on('micro')
-async def callback(event, data):
+async def micro_callback(event, data):
     '''Callback for serial device 1'''
     print(event, data)
 
 @teensy.on('teensy')
-async def callback(event, data):
+async def teensy_callback(event, data):
     '''Callback for serial device 2'''
     print(event, data)
 
