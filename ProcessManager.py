@@ -182,6 +182,7 @@ class ProcessManager:
             except KeyError:
                 pass
 
+    @staticmethod
     def run(self):
         """Run the event loop"""
         loop = asyncio.get_event_loop()
