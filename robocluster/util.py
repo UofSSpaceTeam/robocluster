@@ -4,6 +4,7 @@ import re
 from functools import wraps
 from inspect import iscoroutinefunction
 
+
 def as_coroutine(func):
     """
     Convert a function to a coroutine that can be awaited.

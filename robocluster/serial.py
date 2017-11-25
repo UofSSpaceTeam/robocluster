@@ -1,8 +1,11 @@
-'''Handles comunication to serial devices'''
-import serial_asyncio
+"""Handles comunication to serial devices."""
+
 import asyncio
 import json
 from collections import defaultdict
+
+import pyvesc
+import serial_asyncio
 
 from .util import as_coroutine
 
@@ -10,43 +13,52 @@ BAUDRATE = 115200
 
 
 class SerialDevice:
-    """
-    A serial device that can optionally be integrated
-    with the robocluster network.
-    """
+    """A serial device that can be integrated with the robocluster network."""
 
-    def __init__(self, usbpath, baudrate=BAUDRATE, pktformat='json', loop=None):
+    def __init__(self, usb_path, baudrate=BAUDRATE, encoding='json', loop=None):
+        """Initialize serial device."""
         self._loop = loop if loop else asyncio.get_event_loop()
-        self._format = pktformat
+        self._encoding = encoding
         self._reader = None  # once initialized, an asyncio.StreamReader
         self._writer = None  # once initialized, an asyncio.StreamWriter
-        self._usbpath = usbpath
+        self._usb_path = usb_path
         self._baudrate = baudrate
         self.events = defaultdict(list)
 
     def __str__(self):
-        """String representation of a SerialDevice"""
-        return 'SerialDevice(usbpath={}, baudrate={}, pktformat={})'.format(
-                self._usbpath, self._baudrate, self._format
-                )
+        """Return string representation of a SerialDevice."""
+        return 'SerialDevice(usb_path={}, baudrate={}, encoding={})'.format(
+            self._usb_path,
+            self._baudrate,
+            self._encoding,
+        )
 
     async def __aenter__(self):
-        """Enter context manager and initialize the StreamReader and StreamWriter."""
-        self._reader, self._writer = await serial_asyncio.open_serial_connection(
-                loop=self._loop,
-                url=self._usbpath,
-                baudrate=self._baudrate)
+        """Enter async context manager."""
+        r, w = await serial_asyncio.open_serial_connection(
+            loop=self._loop,
+            url=self._usb_path,
+            baudrate=self._baudrate
+        )
+        self._reader, self._writer = r, w
         return self
 
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(self, *exc):
+        """Exit async context manager."""
         pass
 
-    def isInitialized(self):
-        """Checks if the StreamReader and StreamWriter are initialized"""
+    @parameter
+    def usb_path(self):
+        """Path to the usb device."""
+        return self._usb_path
+
+    @parameter
+    def initialized(self):
+        """Return if the StreamReader and StreamWriter are initialized."""
         return self._reader and self._writer
 
     def read_byte(self):
-        """Read a single byte from the serial device"""
+        """Read a single byte from the serial device."""
         if not self._reader:
             raise RuntimeError("Serial reader not initialized yet")
         return self._reader.read(1)
@@ -55,7 +67,7 @@ class SerialDevice:
         """Read a json packet from the serial device."""
         if not self._reader:
             raise RuntimeError("Serial reader not initialized yet")
-        if self._format == 'json':
+        if self._encoding == 'json':
             pkt = ''
             curleystack = 0
             squarestack = 0
@@ -75,33 +87,35 @@ class SerialDevice:
                 if curleystack == 0 and squarestack == 0:
                     done_reading = True
             return json.loads(pkt)
-        elif self._format == 'vesc':
-            import pyvesc
+        elif self._encoding == 'vesc':
             # Taken from Roveberrypy
-            to_int = lambda b: int.from_bytes(b, byteorder='big')
-            head = await self._reader.read(1)
+            def to_int(b):
+                return int.from_bytes(b, byteorder='big')
+            header = await self._reader.read(1)
             # magic VESC header must be 2 or 3
-            if not to_int(head) == 2 or to_int(head) == 3:
-                return None # raise error maybe?
-            length = await self._reader.read(to_int(head) - 1)
-            packet = head + length + await self._reader.read(to_int(length) + 4)
-            msg, _ = pyvesc.decode(packet)
-            return {'event': msg.__class__.__name__,
-                    'data': msg}
+            if not to_int(header) == 2 or to_int(header) == 3:
+                return None  # raise error maybe?
+            length = await self._reader.read(to_int(header) - 1)
+            packet = await self._reader.read(to_int(length) + 4)
+            msg, _ = pyvesc.decode(head + length + packet)
+            return {
+                'event': msg.__class__.__name__,
+                'data': msg
+            }
 
         raise RuntimeError('Packet format type not supported')
 
     async def write_packet(self, data_object):
-        """Write a packet (or bytes) to the serial device"""
+        """Write a packet (or bytes) to the serial device."""
         if not self._writer:
             raise RuntimeError("Serial writer not initialized yet")
-        if self._format == 'raw':
+        if self._encoding == 'raw':
             return self._writer.write(data_object)
-        elif self._format == 'utf8':
+        elif self._encoding == 'utf8':
             return self._writer.write(data_object.encode())
-        elif self._format == 'json':
+        elif self._encoding == 'json':
             return self._writer.write(json.dumps(data_object).encode())
-        elif self._format == 'vesc':
+        elif self._encoding == 'vesc':
             import pyvesc
             return self._writer.write(pyvesc.encode(data_object))
         raise RuntimeError('Packet format type not supported')

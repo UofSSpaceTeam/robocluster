@@ -5,7 +5,6 @@ from collections import defaultdict
 from contextlib import suppress
 from fnmatch import fnmatch
 from functools import wraps
-from inspect import iscoroutinefunction
 from threading import Thread
 
 from .net import Socket, key_to_multicast
@@ -42,7 +41,7 @@ class Device:
         )
         self._receiver.bind()
 
-        self._serial_device = {}
+        self._serial_devices = {}
 
     def publish(self, topic, data):
         """Publish to topic."""
@@ -101,12 +100,9 @@ class Device:
                 for callback in callbacks:
                     self._loop.create_task(callback(event, data))
 
-    async def _serial_read_task(self, serialdevice):
-        """
-        Recieve packets from a linked serial device
-        and call the appropriate callbacks.
-        """
-        async with serialdevice as ser:
+    async def _serial_read_task(self, serial_device):
+        """Handle callbacks for a serial_device."""
+        async with serial_device as ser:
             while True:
                 packet = await ser.read_packet()
                 event, data = packet['event'], packet['data']
@@ -114,16 +110,19 @@ class Device:
                     for callback in ser.events[event]:
                         self._loop.create_task(callback(event, data))
 
-    def link_serial(self, serialdevice):
-        """Integrate an existing serial device I/O for pub/sub communication."""
-        self._serial_device[serialdevice._usbpath] = serialdevice
-        self._serial_device[serialdevice._usbpath]._loop = self._loop
+    def link_serial(self, serial_device):
+        """Link an existing serial device into the event loop."""
+        serial_device._loop = self._loop
+        self._serial_devices[serial_device.usb_path] = serial_device
 
-    def create_serial(self, usbpath, pktformat='json'):
-        """Create a new SerialDevice that is integrated with the callback system"""
-        self._serial_device[usbpath] = SerialDevice(
-                usbpath, pktformat=pktformat, loop=self._loop)
-        return self._serial_device[usbpath]
+    def create_serial(self, usb_path, encoding='json'):
+        """Create a new SerialDevice."""
+        self._serial_devices[usb_path] = SerialDevice(
+            usb_path,
+            encoding=encoding,
+            loop=self._loop,
+        )
+        return self._serial_devices[usb_path]
 
     def start(self):
         """Start device."""
@@ -139,8 +138,8 @@ class Device:
 
         loop.create_task(self._send_task())
         loop.create_task(self._receive_task())
-        for serialdevice in self._serial_device.values():
-            self._loop.create_task(self._serial_read_task(serialdevice))
+        for serial_device in self._serial_devices.values():
+            self._loop.create_task(self._serial_read_task(serial_device))
         loop.run_forever()
 
         for task in asyncio.Task.all_tasks(loop=loop):
