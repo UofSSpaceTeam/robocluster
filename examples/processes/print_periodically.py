@@ -1,3 +1,6 @@
+'''Print stuff periodically
+Ussage: print_periodically.py <print_interval> <exit-time>
+'''
 import sys
 import time
 

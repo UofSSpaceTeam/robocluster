@@ -1,3 +1,4 @@
+'''Connects to a serial device and prints data from it.'''
 from robocluster import Device
 
 device = Device('link', 'rover')

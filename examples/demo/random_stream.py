@@ -1,3 +1,4 @@
+'''Publish a stream of random data'''
 from robocluster import Device
 import random
 

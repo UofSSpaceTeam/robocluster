@@ -1,3 +1,4 @@
+'''Example of a files that configures the processes and runs them'''
 from ProcessManager import ProcessManager, RunOnce
 
 PATH = './examples/demo'

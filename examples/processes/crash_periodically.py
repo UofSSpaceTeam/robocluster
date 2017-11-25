@@ -1,3 +1,6 @@
+'''Crash periodically
+Usage: crash_periodically.py <print-interval> <crash-time>
+'''
 import sys
 import time
 

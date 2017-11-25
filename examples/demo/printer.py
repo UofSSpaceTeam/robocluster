@@ -1,3 +1,4 @@
+'''Prints the random date from random_stream'''
 from robocluster import Device
 
 device = Device('printer', 'computer1')
