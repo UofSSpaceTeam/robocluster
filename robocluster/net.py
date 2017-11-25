@@ -1,8 +1,9 @@
 import asyncio
+import ipaddress
 import json
+import os
 import socket
 import struct
-import ipaddress
 from hashlib import sha256
 
 
@@ -63,7 +64,8 @@ class Socket:
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         ip, port = self._address
-        if self.is_multicast:
+        if self.is_multicast and os.name == 'nt':
+            # Windows does not support bind on a specific multicast ip
             ip = ''
         self._socket.bind((ip, port))
 

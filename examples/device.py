@@ -9,12 +9,8 @@ group = str(uuid4())
 
 device_a = Device('device-a', group)
 
-@device_a.on('device-b/hello')
-def hello_a(event, data):
-    print(event, data)
-
-@device_a.on('device-b/every')
-def every_a(event, data):
+@device_a.on('device-b/*')
+def echo(event, data):
     print(event, data)
 
 device_b = Device('device-b', group)

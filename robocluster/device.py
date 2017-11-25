@@ -3,6 +3,9 @@
 import asyncio
 from collections import defaultdict
 from contextlib import suppress
+from fnmatch import fnmatch
+from functools import wraps
+from inspect import iscoroutinefunction
 from threading import Thread
 
 from .net import Socket, key_to_multicast
@@ -92,8 +95,11 @@ class Device:
         while True:
             packet, _ = await self._receiver.receive()
             event, data = packet['event'], packet['data']
-            for callback in self.events[event]:
-                self._loop.create_task(callback(event, data))
+            for key, callbacks in self.events.items():
+                if not fnmatch(event, key):
+                    continue
+                for callback in callbacks:
+                    self._loop.create_task(callback(event, data))
 
     async def _serial_read_task(self, serialdevice):
         """
