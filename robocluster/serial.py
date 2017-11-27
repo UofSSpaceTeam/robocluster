@@ -4,6 +4,7 @@ import asyncio
 import json
 from collections import defaultdict
 
+import pyvesc
 import serial_asyncio
 
 from .util import as_coroutine
@@ -115,7 +116,6 @@ class SerialDevice:
         elif self._encoding == 'json':
             return self._writer.write(json.dumps(data_object).encode())
         elif self._encoding == 'vesc':
-            import pyvesc
             return self._writer.write(pyvesc.encode(data_object))
         raise RuntimeError('Packet format type not supported')
 
