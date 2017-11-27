@@ -6,7 +6,7 @@ from pyvesc import BlinkLed
 
 
 device = Device('link', 'rover')
-serial = device.create_serial('/dev/ttyACM0', pktformat='vesc')
+serial = device.create_serial('/dev/ttyACM0', encoding='vesc')
 
 blink_val = 0
 

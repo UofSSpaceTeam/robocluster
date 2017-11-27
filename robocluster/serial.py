@@ -4,7 +4,6 @@ import asyncio
 import json
 from collections import defaultdict
 
-import pyvesc
 import serial_asyncio
 
 from .util import as_coroutine
