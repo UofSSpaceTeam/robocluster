@@ -5,28 +5,11 @@ from collections import defaultdict
 from contextlib import suppress
 from fnmatch import fnmatch
 from functools import wraps
-from inspect import iscoroutinefunction
 from threading import Thread
 
 from .net import Socket, key_to_multicast
-from .util import duration_to_seconds
-
-
-def as_coroutine(func):
-    """
-    Convert a function to a coroutine that can be awaited.
-
-    Notes:
-    If the function is already a coroutine, it is returned directly.
-
-    """
-    @wraps(func)
-    async def _wrapper(*args, **kwargs):
-        func(*args, *kwargs)
-
-    if iscoroutinefunction(func):
-        return func
-    return _wrapper
+from .util import duration_to_seconds, as_coroutine
+from .serial import SerialDevice
 
 
 class Device:
@@ -57,6 +40,8 @@ class Device:
             loop=self._loop
         )
         self._receiver.bind()
+
+        self._serial_devices = {}
 
     def publish(self, topic, data):
         """Publish to topic."""
@@ -115,6 +100,30 @@ class Device:
                 for callback in callbacks:
                     self._loop.create_task(callback(event, data))
 
+    async def _serial_read_task(self, serial_device):
+        """Handle callbacks for a serial_device."""
+        async with serial_device as ser:
+            while True:
+                packet = await ser.read_packet()
+                event, data = packet['event'], packet['data']
+                if event in ser.events:
+                    for callback in ser.events[event]:
+                        self._loop.create_task(callback(event, data))
+
+    def link_serial(self, serial_device):
+        """Link an existing serial device into the event loop."""
+        serial_device._loop = self._loop
+        self._serial_devices[serial_device.usb_path] = serial_device
+
+    def create_serial(self, usb_path, encoding='json'):
+        """Create a new SerialDevice."""
+        self._serial_devices[usb_path] = SerialDevice(
+            usb_path,
+            encoding=encoding,
+            loop=self._loop,
+        )
+        return self._serial_devices[usb_path]
+
     def start(self):
         """Start device."""
         if self._thread:
@@ -129,6 +138,8 @@ class Device:
 
         loop.create_task(self._send_task())
         loop.create_task(self._receive_task())
+        for serial_device in self._serial_devices.values():
+            self._loop.create_task(self._serial_read_task(serial_device))
         loop.run_forever()
 
         for task in asyncio.Task.all_tasks(loop=loop):
