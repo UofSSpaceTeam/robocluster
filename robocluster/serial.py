@@ -47,12 +47,12 @@ class SerialDevice:
         """Exit async context manager."""
         pass
 
-    @parameter
+    @property
     def usb_path(self):
         """Path to the usb device."""
         return self._usb_path
 
-    @parameter
+    @property
     def initialized(self):
         """Return if the StreamReader and StreamWriter are initialized."""
         return self._reader and self._writer
