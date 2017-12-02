@@ -1,6 +1,7 @@
 import random
+from inspect import iscoroutinefunction
 
-from robocluster.util import duration_to_seconds
+from robocluster.util import duration_to_seconds, as_coroutine
 
 def test_duration_to_seconds():
     # test that integers are unchanged
@@ -37,4 +38,14 @@ def test_duration_to_seconds():
     # test invalid input
     assert(duration_to_seconds('invalid') == -1)
     assert(duration_to_seconds('1 ps') == -1)
+
+def test_as_coroutine():
+    def dummy():
+        pass
+
+    async def dummy_coro():
+        pass
+
+    assert(iscoroutinefunction(as_coroutine(dummy)))
+    assert(iscoroutinefunction(as_coroutine(dummy_coro)))
 
