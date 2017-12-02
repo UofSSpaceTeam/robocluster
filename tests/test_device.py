@@ -33,5 +33,18 @@ def test_pubsub():
     device_b.stop()
     assert(recieved_message == True)
 
-if __name__ == '__main__':
-    test_pubsub()
+def test_every():
+    # random group so we don't collide in testing
+    group = str(uuid4())
+    device_a = Device('device_a', group)
+    counter = 0
+
+    @device_a.every(0.01)
+    async def loop():
+        nonlocal counter
+        counter += 1
+
+    device_a.start()
+    sleep(0.02)
+    device_a.stop()
+    assert(counter == 2)
