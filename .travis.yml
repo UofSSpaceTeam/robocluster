@@ -5,12 +5,10 @@ python:
 
 install:
   - pip install pytest coveralls pytest-cov
-  - pip install .
+  - pip install -e .
 
 script:
-    - coverage debug sys
-    - coverage debug config
-    - pytest --cov=robocluster tests/test_device.py
+    - pytest --cov=robocluster tests
 
-# after_success:
-#     coveralls
+after_success:
+    coveralls
