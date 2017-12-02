@@ -1,6 +1,6 @@
 from uuid import uuid4
 import random
-from time import sleep
+from time import sleep, time
 
 from robocluster import Device
 
@@ -38,13 +38,25 @@ def test_every():
     group = str(uuid4())
     device_a = Device('device_a', group)
     counter = 0
+    last_time = time()
+    loop_delay = 0
 
     @device_a.every(0.01)
     async def loop():  # pylint: disable=W0612
-        nonlocal counter
+        nonlocal counter, last_time, loop_delay
+        # measure period of loop
+        curr_time = time()
+        loop_delay = curr_time-last_time
+        last_time = curr_time
+
         counter += 1
+        if counter == 2:
+            # we've ran a few times at least
+            device_a.stop()
 
     device_a.start()
-    sleep(0.02)
+    sleep(0.04)
     device_a.stop()
     assert(counter == 2)
+    tolerance = 0.001
+    assert(loop_delay - 0.01 < tolerance)
