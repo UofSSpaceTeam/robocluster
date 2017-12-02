@@ -4,11 +4,13 @@ python:
   - '3.6'
 
 install:
-  - pip install pytest coveralls pytest-cov
+  - pip install pytest coveralls pytest-cov codacy-coverage
   - pip install -e .
 
 script:
     - pytest --cov=robocluster tests
 
 after_success:
-    coveralls
+    - coveralls
+    - coverage xml
+    - python-codacy-coverage -r coverage.xml
