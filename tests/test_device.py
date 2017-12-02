@@ -15,11 +15,11 @@ def test_pubsub():
     device_b = Device('device-b', group)
 
     @device_b.task
-    async def publish():
+    async def publish():  # pylint: disable=W0612
         await device_b.publish(test_key, test_val)
 
     @device_a.on('device-b/{}'.format(test_key))
-    async def callback(event, data):
+    async def callback(event, data):  # pylint: disable=W0612
         nonlocal recieved_message
         assert(event == 'device-b/{}'.format(test_key))
         assert(data == test_val)
@@ -31,7 +31,7 @@ def test_pubsub():
     sleep(0.01)
     device_a.stop()
     device_b.stop()
-    assert(recieved_message == True)
+    assert(recieved_message)
 
 def test_every():
     # random group so we don't collide in testing
@@ -40,7 +40,7 @@ def test_every():
     counter = 0
 
     @device_a.every(0.01)
-    async def loop():
+    async def loop():  # pylint: disable=W0612
         nonlocal counter
         counter += 1
 
