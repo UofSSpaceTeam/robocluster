@@ -4,7 +4,7 @@ python:
   - '3.6'
 
 install:
-  - pip install pytest coveralls
+  - pip install pytest coveralls pytest-cov
   - pip install .
 
 script:
