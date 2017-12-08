@@ -2,53 +2,108 @@
 
 import shlex
 import sys
+import asyncio
+import logging
 from subprocess import Popen
 from time import sleep
+
+log = logging.getLogger("Process-Manager")
+log.setLevel(logging.INFO)
 
 class RoboProcess:
     """Manages and keeps track of a process."""
 
-    def __init__(self, cmd):
+    def __init__(self, name, cmd):
         """Initialize a process containing command cmd."""
+        if not isinstance(cmd, str):
+            raise ValueError('command must be a string')
+        self.name = name
         self.cmd = cmd
-        self.popen = None
+        self.pid = None
+        self.released = False
+        self.process = None
 
-    def start(self):
+    async def restart(self):
         """
-        Start the process.
+        Restarts/starts a process. If the process is currenlty executing it will be killed then restarted.
 
-        Ignored if process is already running.
+        Returns
+        -------
+        asyncio.subprocess.Process
+            The created asyncio process.
         """
-        if not self.popen:
-            args = shlex.split(self.cmd)
-            self.popen = Popen(args)
 
-    def stop(self):
+        # if the process was released, unrelease it
+        self._released = False
+
+        # kill the process if it exists
+        await self.kill()
+
+        self.process = await asyncio.create_subprocess_shell(self.cmd)
+
+        self.pid = self.process.pid
+        return self.process
+
+    async def run(self):
+        """
+        Run the given process definition until it exists successfully. This function is a coroutine.
+
+        Returns
+        -------
+        int
+            The program's return value.
+        """
+        # start the loop until the process exists successfully
+        returncode = None
+        self.process = await self.restart()
+        while self.process:
+            log.info("Started process({}, '{}')".format(self.pid, self.name))
+            returncode = await self.process.wait()
+            last_pid = self.pid
+            self.pid = None
+            if self._released:
+                self.process = None
+            else:
+                self.on_exit(returncode)
+            if self.process:
+                log.warning("Process ({}, '{}') failed, exiting with {}. Restaring process.".format(last_pid, self.name, returncode))
+            else:
+                log.info("Process ({}, {}) exited successfully with {}.".format(last_pid, self.name, returncode))
+        return returncode
+
+    async def kill(self, timeout=1, release=False):
         """
         Stop the process.
 
         Ignored if the process is not running.
         """
-        if self.popen:
-            self.popen.terminate()
+        if self.process:
+            self.process.terminate()
             try:
-                self.popen.wait(timeout=1)
-            except TimeoutError:
-                self.popen.kill()
-                self.popen.wait()
-            self.popen = None
+                future = self.process.wait()
+                await asyncio.wait_for(future, timeout)
+            except asyncio.TimeoutError:
+                self.process.kill()
+                await self.process.wait()
+            self.released = release
 
-    def status(self):
-        """Return the status of a process."""
-        raise NotImplementedError()
+    def on_exit(self, returncode):
+        """To be called when the process exits"""
+        raise NotImplementedError('RoboProcess does not define a default behaivior on exit. Please inherit and define the on_exit(returncode) method')
 
-    def verify(self):
-        """Verify if a process is running properly."""
-        raise NotImplementedError()
+class RunOnce(RoboProcess):
+    """Process that runs """
+    def on_exit(self, returncode):
+        self.process = None
 
-    def fix(self):
-        """Fix a process if its not running properly."""
-        raise NotImplementedError()
+class RestartOnCrash(RoboProcess):
+    """Process that restarts on non zero exit"""
+    def on_exit(self, returncode):
+        if returncode != 0:
+            self.restart()
+        else:
+            self.process = None
+
 
 class ProcessManager:
     """
@@ -65,6 +120,7 @@ class ProcessManager:
     def __init__(self):
         """Initialize a process manager."""
         self.processes = {}  # store processes by name
+        self._futures = []
 
     def __enter__(self):
         """Enter context manager."""
@@ -87,13 +143,13 @@ class ProcessManager:
         name    - name to identify process, must be unique to process manager.
         command - shell command for process to execute.
         """
-        if name in self.processes:
+        self.addProcess(RoboProcess(name, command))
+
+    def addProcess(self, roboprocess):
+        """Adds roboprocess that was created externally to the manager"""
+        if roboprocess.name in self.processes:
             raise ValueError('Process with the same name exists: {name}')
-
-        if not isinstance(command, str):
-            raise ValueError('command must be a string')
-
-        self.processes[name] = RoboProcess(command)
+        self.processes[roboprocess.name] = roboprocess
 
 
     def start(self, *names):
@@ -106,11 +162,12 @@ class ProcessManager:
         for process in processes:
             try:
                 print('Starting:', process)
-                self.processes[process].start()
+                self._futures.append(asyncio.ensure_future(
+                    self.processes[process].run()))
             except KeyError:
                 pass
 
-    def stop(self, *names):
+    def stop(self, *names, timeout=0):
         """
         Stop processes.
 
@@ -120,32 +177,38 @@ class ProcessManager:
         for process in processes:
             try:
                 print('Stopping:', process)
-                self.processes[process].stop()
+                asyncio.ensure_future(
+                        self.processes[process].kill(timeout=timeout, release=True))
             except KeyError:
                 pass
+
+    @staticmethod
+    def run(self):
+        """Run the event loop"""
+        loop = asyncio.get_event_loop()
+        loop.run_forever()
 
 
 def main():
     """Run a process manager in the foreground."""
-    process_names = [
-        ["sleep", "python sleeper.py"],
-        ["crash", "python crash.py"],
+    process_list = [
+        RunOnce('sleep', 'python sleeper.py'),
+        RunOnce("printer", "python ./examples/processes/print_periodically.py 1 4"),
+        RunOnce("terminal", 'termite'),
+        # RestartOnCrash('crasher', 'python crash.py')
     ]
 
     with ProcessManager() as manager:
         """Initialize all the processes"""
-        for proc in process_names:
-            manager.createProcess(*proc)
+        for proc in process_list:
+            manager.addProcess(proc)
 
         manager.start()
 
         try:
-            while True:
-                # TODO: Verify processes.
-                sleep(1)
+            manager.run()
         except KeyboardInterrupt:
             pass
-
 
 if __name__ == "__main__":
     exit(main())
