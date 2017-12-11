@@ -25,8 +25,8 @@ def test_serial_write():
     time.sleep(1)
     msg = os.read(master, 100)
     print(msg)
-    assert(json.loads(msg) == TEST_DATA)
+    assert(json.loads(msg.decode('utf-8')) == TEST_DATA)
     device.stop()
 
 if __name__ ==  '__main__':
-    test_serial()
+    test_serial_write()
