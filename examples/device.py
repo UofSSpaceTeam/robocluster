@@ -14,11 +14,12 @@ def echo(event, data):
     print(event, data)
 
 device_b = Device('device-b', group)
+device_b['message'] = 'Hello World {}!'
 
 @device_b.task
 async def hello_b():
     counter = count()
-    message = 'Hello World {}!'
+    message = device_b['message']
     while True:
         await device_b.publish('hello', message.format(next(counter)))
         await device_b.sleep(1)

@@ -43,6 +43,14 @@ class Device:
 
         self._serial_devices = {}
 
+        self._storage = {}
+
+    def __setitem__(self, key, value):
+        self._storage[key] = value
+
+    def __getitem__(self, key):
+        return self._storage[key]
+
     def publish(self, topic, data):
         """Publish to topic."""
         packet = {
