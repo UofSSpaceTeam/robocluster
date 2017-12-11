@@ -46,9 +46,11 @@ class Device:
         self._storage = {}
 
     def __setitem__(self, key, value):
+        """ Allows you to store values with `device['key'] = value` """
         self._storage[key] = value
 
     def __getitem__(self, key):
+        """ Allows you to retrieve values with `value = device['key']` """
         return self._storage[key]
 
     def publish(self, topic, data):
