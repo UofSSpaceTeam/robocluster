@@ -1,3 +1,5 @@
 robocluster.egg-info
 __pycache__
 build
+.cache
+.coverage
