@@ -1,4 +1,24 @@
+import sys
+
 from setuptools import setup
+from setuptools.command.test import test as TestCommand
+
+class PyTest(TestCommand):
+    """
+    Copied from the pytest documentation,
+    Allows the test suite to be run from setup.py
+    """
+    user_options = [('pytest-args=', 'a', "Arguments to pass to pytest")]
+    '''`python setup.py test -a "duration=5"`'''
+
+    def initialize_options(self):
+        TestCommand.initialize_options(self)
+        self.pytest_args = '--cov=robocluster tests'
+
+    def run_tests(self):
+        import shlex, pytest
+        errno = pytest.main(shlex.split(self.pytest_args))
+        sys.exit(errno)
 
 setup(name='robocluster',
       version='0.1',
@@ -16,5 +36,6 @@ setup(name='robocluster',
             'https://github.com/UofSSpaceTeam/PyVESC.git'
       ],
       zip_safe=False,
+      tests_require=['pytest', 'coverage', 'pytest-cov'],
+      cmdclass={'test': PyTest},
 )
-
