@@ -7,6 +7,8 @@ import logging
 from subprocess import Popen
 from time import sleep
 
+from robocluster import Device
+
 log = logging.getLogger("Process-Manager")
 log.setLevel(logging.INFO)
 
@@ -121,6 +123,24 @@ class ProcessManager:
         """Initialize a process manager."""
         self.processes = {}  # store processes by name
         self._futures = []
+        self.remote_api_device = Device('remote-api', 'Manager')
+
+        @self.remote_api_device.on('*/createProcess')
+        async def remote_createProcess(event, data):
+            print('got remote createProcess')
+            name = data['name']
+            command = data['command']
+            self.createProcess(name, command)
+            self.start(name)
+
+        @self.remote_api_device.on('*/stop')
+        async def remote_stop(event, data):
+            print('Got remote stop')
+            self.stop()
+
+        @self.remote_api_device.task
+        async def rem_print_started():
+            print('remote api running')
 
     def __enter__(self):
         """Enter context manager."""
@@ -129,6 +149,7 @@ class ProcessManager:
     def __exit__(self, *exc):
         """Exit context manager, makes sure all processes are stopped."""
         self.stop()
+        self.remote_api_device.stop()
         return False
 
     def isEmpty(self):
@@ -177,16 +198,17 @@ class ProcessManager:
         for process in processes:
             try:
                 print('Stopping:', process)
-                asyncio.ensure_future(
-                        self.processes[process].kill(timeout=timeout, release=True))
+                asyncio.run_coroutine_threadsafe(
+                        self.processes[process].kill(timeout=timeout, release=True),
+                        self.loop)
             except KeyError:
                 pass
 
-    @staticmethod
     def run(self):
         """Run the event loop"""
-        loop = asyncio.get_event_loop()
-        loop.run_forever()
+        self.remote_api_device.start()
+        self.loop = asyncio.get_event_loop()
+        self.loop.run_forever()
 
 
 def main():
@@ -194,7 +216,6 @@ def main():
     process_list = [
         RunOnce('sleep', 'python sleeper.py'),
         RunOnce("printer", "python ./examples/processes/print_periodically.py 1 4"),
-        RunOnce("terminal", 'termite'),
         # RestartOnCrash('crasher', 'python crash.py')
     ]
 
