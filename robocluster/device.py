@@ -11,6 +11,19 @@ from .net import Socket, key_to_multicast
 from .util import duration_to_seconds, as_coroutine
 from .serial import SerialDevice
 
+class AttributeDict(dict):
+    """
+    A dictionary that allows you to acces entries like
+    you would attributes in an object.
+    """
+    def __getattr__(self, name):
+        return self[name]
+
+    def __setattr__(self, name, value):
+        self[name] = value
+
+    def __delattr__(self, name):
+        del self[name]
 
 class Device:
     """A device to interact with the robocluster network."""
@@ -42,6 +55,13 @@ class Device:
         self._receiver.bind()
 
         self._serial_devices = {}
+
+        self.__storage = AttributeDict()
+
+    @property
+    def storage(self):
+        """Local device storage"""
+        return self.__storage
 
     def publish(self, topic, data):
         """Publish to topic."""
