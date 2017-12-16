@@ -29,13 +29,22 @@ setup(name='robocluster',
       license='ECL-2.0',
       packages=['robocluster'],
       install_requires=[
-            'pyserial-asyncio',
-            'pyvesc'
+          'pyserial',
+          'pyserial-asyncio',
+          'pyvesc'
       ],
       dependency_links=[
-            'https://github.com/UofSSpaceTeam/PyVESC.git'
+          'https://github.com/UofSSpaceTeam/PyVESC.git'
       ],
       zip_safe=False,
       tests_require=['pytest', 'coverage', 'pytest-cov'],
       cmdclass={'test': PyTest},
+      classifiers=[
+          'Development Status :: 2 - Pre-Alpha',
+          'Framework :: AsyncIO',
+          'Programming Language :: Python :: 3 :: Only',
+          'Topic :: Software Development :: Embedded Systems',
+          'Topic :: System :: Distributed Computing',
+          'Topic :: System :: Networking',
+      ]
 )
