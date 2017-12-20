@@ -10,9 +10,17 @@ robocluster.Device module
     :show-inheritance:
 
 robocluster.Net module
--------------------------
+----------------------
 
 .. automodule:: robocluster.net
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+robocluster.SerialDevice module
+-------------------------------
+
+.. automodule:: robocluster.serial
     :members:
     :undoc-members:
     :show-inheritance:

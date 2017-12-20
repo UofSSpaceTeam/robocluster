@@ -3,3 +3,5 @@ __pycache__
 build
 .cache
 .coverage
+.eggs
+dist
