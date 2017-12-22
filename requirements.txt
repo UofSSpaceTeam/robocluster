@@ -1,3 +1,2 @@
-pyserial
-pyserial-asyncio
-pyvesc
+# Read the setup.py for install dependencies
+.
