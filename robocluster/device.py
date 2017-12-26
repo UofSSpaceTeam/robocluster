@@ -7,9 +7,9 @@ from fnmatch import fnmatch
 from functools import wraps
 from threading import Thread
 
-from .net import Socket, key_to_multicast
 from .util import duration_to_seconds, as_coroutine
 from .serial import SerialDevice
+from .ports import MulticastPort
 
 class AttributeDict(dict):
     """
@@ -35,24 +35,14 @@ class Device:
         self.name = name
         self.events = defaultdict(list)
 
-        address = key_to_multicast(group)
-
         self._thread = None
         self._loop = loop if loop else asyncio.new_event_loop()
 
-        self._sender = Socket(
-            address,
-            transport=self.transport,
-            loop=self._loop
-        )
-        self._send_queue = asyncio.Queue(loop=self._loop)
+        self._packet_queue = asyncio.Queue(loop=self._loop)
 
-        self._receiver = Socket(
-            address,
-            transport=self.transport,
-            loop=self._loop
-        )
-        self._receiver.bind()
+        self.ports = {
+                'multicast': MulticastPort(name, group, self.transport, self._loop, self._packet_queue)
+        }
 
         self._serial_devices = {}
 
@@ -69,7 +59,7 @@ class Device:
             'event': '{}/{}'.format(self.name, topic),
             'data': data,
         }
-        return self._send_queue.put(packet)
+        return self.ports['multicast'].write(packet)
 
     def on(self, event):
         """Add a callback for an event."""
@@ -103,16 +93,10 @@ class Device:
         seconds = duration_to_seconds(duration)
         return asyncio.sleep(seconds, loop=self._loop)
 
-    async def _send_task(self):
-        """Send packets in the send queue."""
-        while True:
-            packet = await self._send_queue.get()
-            await self._sender.send(packet)
-
-    async def _receive_task(self):
+    async def callback_handler(self):
         """Recieve packets and call the appropriate callbacks."""
         while True:
-            packet, _ = await self._receiver.receive()
+            packet = await self._packet_queue.get()
             event, data = packet['event'], packet['data']
             for key, callbacks in self.events.items():
                 if not fnmatch(event, key):
@@ -156,10 +140,10 @@ class Device:
         loop = self._loop
         asyncio.set_event_loop(loop)
 
-        loop.create_task(self._send_task())
-        loop.create_task(self._receive_task())
+        self.ports['multicast'].enable()
+        loop.create_task(self.callback_handler())
         for serial_device in self._serial_devices.values():
-            self._loop.create_task(self._serial_read_task(serial_device))
+            loop.create_task(self._serial_read_task(serial_device))
         loop.run_forever()
 
         for task in asyncio.Task.all_tasks(loop=loop):
