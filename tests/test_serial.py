@@ -17,9 +17,8 @@ def test_serial_write():
 
     @device.task
     async def write_ser():
-        async with sDevice:
-            await sDevice.write_packet(TEST_DATA)
-            print("done write")
+        await device.ports[os.ttyname(slave)].write(TEST_DATA)
+        print("done write")
 
     device.start()
     time.sleep(1)

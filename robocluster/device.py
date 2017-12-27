@@ -9,7 +9,7 @@ from threading import Thread
 
 from .util import duration_to_seconds, as_coroutine
 from .serial import SerialDevice
-from .ports import MulticastPort
+from .ports import MulticastPort, SerialPort
 
 class AttributeDict(dict):
     """
@@ -41,10 +41,9 @@ class Device:
         self._packet_queue = asyncio.Queue(loop=self._loop)
 
         self.ports = {
-                'multicast': MulticastPort(name, group, self.transport, self._loop, self._packet_queue)
+                'multicast': MulticastPort(name, group, self.transport,
+                    self._packet_queue, self._loop)
         }
-
-        self._serial_devices = {}
 
         self.__storage = AttributeDict()
 
@@ -104,16 +103,6 @@ class Device:
                 for callback in callbacks:
                     self._loop.create_task(callback(event, data))
 
-    async def _serial_read_task(self, serial_device):
-        """Handle callbacks for a serial_device."""
-        async with serial_device as ser:
-            while True:
-                packet = await ser.read_packet()
-                event, data = packet['event'], packet['data']
-                if event in ser.events:
-                    for callback in ser.events[event]:
-                        self._loop.create_task(callback(event, data))
-
     def link_serial(self, serial_device):
         """Link an existing serial device into the event loop."""
         serial_device._loop = self._loop
@@ -121,12 +110,14 @@ class Device:
 
     def create_serial(self, usb_path, encoding='json'):
         """Create a new SerialDevice."""
-        self._serial_devices[usb_path] = SerialDevice(
-            usb_path,
+        self.ports[usb_path] = SerialPort(
+            name=usb_path,
+            group=None,
             encoding=encoding,
             loop=self._loop,
+            packet_queue=self._packet_queue
         )
-        return self._serial_devices[usb_path]
+        self._loop.create_task(self.ports[usb_path].enable())
 
     def start(self):
         """Start device."""
@@ -142,8 +133,6 @@ class Device:
 
         self.ports['multicast'].enable()
         loop.create_task(self.callback_handler())
-        for serial_device in self._serial_devices.values():
-            loop.create_task(self._serial_read_task(serial_device))
         loop.run_forever()
 
         for task in asyncio.Task.all_tasks(loop=loop):
