@@ -8,7 +8,6 @@ from functools import wraps
 from threading import Thread
 
 from .util import duration_to_seconds, as_coroutine
-from .serial import SerialDevice
 from .ports import MulticastPort, SerialPort
 
 class AttributeDict(dict):
@@ -44,6 +43,7 @@ class Device:
                 'multicast': MulticastPort(name, group, self.transport,
                     self._packet_queue, self._loop)
         }
+        self._loop.create_task(self.ports['multicast'].enable())
 
         self.__storage = AttributeDict()
 
@@ -103,11 +103,6 @@ class Device:
                 for callback in callbacks:
                     self._loop.create_task(callback(event, data))
 
-    def link_serial(self, serial_device):
-        """Link an existing serial device into the event loop."""
-        serial_device._loop = self._loop
-        self._serial_devices[serial_device.usb_path] = serial_device
-
     def create_serial(self, usb_path, encoding='json'):
         """Create a new SerialDevice."""
         self.ports[usb_path] = SerialPort(
@@ -131,7 +126,6 @@ class Device:
         loop = self._loop
         asyncio.set_event_loop(loop)
 
-        self.ports['multicast'].enable()
         loop.create_task(self.callback_handler())
         loop.run_forever()
 

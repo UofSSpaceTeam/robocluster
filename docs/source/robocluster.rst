@@ -17,10 +17,10 @@ robocluster.Net module
     :undoc-members:
     :show-inheritance:
 
-robocluster.SerialDevice module
+robocluster.Ports module
 -------------------------------
 
-.. automodule:: robocluster.serial
+.. automodule:: robocluster.ports
     :members:
     :undoc-members:
     :show-inheritance:
