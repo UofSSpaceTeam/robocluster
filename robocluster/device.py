@@ -52,18 +52,30 @@ class Device:
         """Local device storage"""
         return self.__storage
 
-    def publish(self, topic, data):
+    async def publish(self, topic, data, port='multicast'):
         """Publish to topic."""
         packet = {
             'event': '{}/{}'.format(self.name, topic),
             'data': data,
         }
-        return self.ports['multicast'].write(packet)
+        if port == '*':
+            for p in self.ports:
+                await p.write(packet)
+        else:
+            if isinstance(port, str):
+                port = [port]
+            for p in port:
+                await self.ports[p].write(packet)
 
-    def on(self, event):
+    def on(self, event, ports=None):
         """Add a callback for an event."""
+        if isinstance(ports, str):
+            ports = [ports]
         def _decorator(callback):
-            coro = as_coroutine(callback)
+            coro = {
+                'task': as_coroutine(callback),
+                'port': ports
+            }
             self.events[event].append(coro)
             return callback
         return _decorator
@@ -101,7 +113,8 @@ class Device:
                 if not fnmatch(event, key):
                     continue
                 for callback in callbacks:
-                    self._loop.create_task(callback(event, data))
+                    if callback['port'] is None or packet['port'] in callback['port']:
+                        self._loop.create_task(callback['task'](event, data))
 
     def create_serial(self, usb_path, encoding='json'):
         """Create a new SerialDevice."""

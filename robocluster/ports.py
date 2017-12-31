@@ -178,9 +178,9 @@ class SerialPort(Port):
                 msg, _ = pyvesc.decode(header + length + packet)
                 _packet = {
                     'event': msg.__class__.__name__,
-                    'data': msg,
-                    'port': self.name
+                    'data': msg
                 }
+            _packet['port'] = self.name
             debug("Got packet {}".format(_packet))
             await self._packet_queue.put(_packet)
 
