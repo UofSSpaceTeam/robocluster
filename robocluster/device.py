@@ -8,7 +8,7 @@ from functools import wraps
 from threading import Thread
 
 from .util import duration_to_seconds, as_coroutine
-from .ports import MulticastPort, SerialPort
+from .ports import MulticastPort, SerialPort, TcpPort
 
 class AttributeDict(dict):
     """
@@ -126,6 +126,21 @@ class Device:
             packet_queue=self._packet_queue
         )
         self._loop.create_task(self.ports[usb_path].enable())
+
+    def create_tcp(self, device_name, encoding='json'):
+        # find device ip, port
+        address = 'localhost'
+        port=9000
+        # create TcpPort
+        self.ports[device_name] = TcpPort(
+            name=device_name,
+            host=address,
+            port=port,
+            encoding=encoding,
+            packet_queue=self._packet_queue,
+            loop=self._loop
+        )
+        self._loop.create_task(self.ports[device_name].enable())
 
     def start(self):
         """Start device."""

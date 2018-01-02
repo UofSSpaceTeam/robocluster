@@ -82,6 +82,91 @@ class MulticastPort(Port):
             debug("Got packet: {}".format(packet))
             await self._packet_queue.put(packet)
 
+class TcpPort(Port):
+
+    def __init__(self, name, host, port, encoding, packet_queue, loop=None):
+        self.name = name
+        self._loop = loop if loop else asyncio.get_event_loop()
+        self._packet_queue = packet_queue
+        self._reader = None
+        self._writer = None
+        self._encoding = encoding
+        self._host = host
+        self._port = port
+        self._send_queue = asyncio.Queue(loop=self._loop)
+
+    async def _init_connection(self):
+        await asyncio.start_server(
+            self._receive_task,
+            '127.0.0.1',
+            self._port, # TODO better solution for port
+            loop=self._loop
+        )
+        r, w = await asyncio.open_connection(
+                host=self._host,
+                port=self._port,
+                loop=self._loop
+        )
+        self._reader, self._writer = r, w
+        debug("TCP reader and writer initialized")
+
+    async def read(self):
+        pass
+
+    def write(self, packet):
+        debug("TCP Submitting packet to send: {}".format(packet))
+        return self._send_queue.put(packet)
+
+    async def _send_task(self):
+        if not self._writer:
+            raise RuntimeError("TCP writer not initialized yet")
+        debug("TCP Send task running")
+        while True:
+            packet = await self._send_queue.get()
+            debug("TCP Sending packet {}".format(packet))
+            if self._encoding == 'raw':
+                await self._writer.write(packet)
+            elif self._encoding == 'utf8':
+                await self._writer.write(packet.encode())
+            elif self._encoding == 'json':
+                self._writer.write(json.dumps(packet).encode())
+            else:
+                raise RuntimeError('Packet format type not supported')
+
+    async def _receive_task(self, reader, writer):
+        debug("TCP receive_task Running")
+        while True:
+            _packet = {}
+            if self._encoding == 'json':
+                pkt = ''
+                curleystack = 0
+                squarestack = 0
+                done_reading = False
+                while not done_reading:
+                    b = await reader.read(1)
+                    b = b.decode()
+                    if b == '{':
+                        curleystack += 1
+                    elif b == '}':
+                        curleystack -= 1
+                    elif b == '[':
+                        squarestack += 1
+                    elif b == ']':
+                        squarestack -= 1
+                    pkt += b
+                    if curleystack == 0 and squarestack == 0:
+                        done_reading = True
+                _packet = json.loads(pkt)
+            else:
+                raise RuntimeError("Encoding not supported yet")
+            _packet['port'] = self.name
+            debug("Got packet {}".format(_packet))
+            await self._packet_queue.put(_packet)
+
+    async def enable(self):
+        await self._init_connection()
+        self._loop.create_task(self._send_task())
+
 class SerialPort(Port):
 
     def __init__(self, name, group, encoding, loop, packet_queue):
@@ -103,7 +188,7 @@ class SerialPort(Port):
             baudrate=self._baudrate
         )
         self._reader, self._writer = r, w
-        debug("reader and writer initialized")
+        debug("Serial reader and writer initialized")
 
     async def read(self):
         """Read a single byte from the serial device."""
@@ -142,7 +227,7 @@ class SerialPort(Port):
         """Recieve packets and notify the upstream Device"""
         if not self._reader:
             raise RuntimeError("Serial reader not initialized yet")
-        debug("Receive task running")
+        debug("Serial Receive task running")
         while True:
             _packet = {}
             if self._encoding == 'json':
