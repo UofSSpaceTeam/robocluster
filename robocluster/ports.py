@@ -1,5 +1,6 @@
 import asyncio
 import json
+import socket
 
 import pyvesc
 import serial_asyncio
@@ -89,6 +90,15 @@ class IngressTcpPort(Port):
         self._loop = loop if loop else asyncio.get_event_loop()
         self._packet_queue = packet_queue
         self._encoding = encoding
+        self._sockname = None  # Connection information address:port
+
+    async def __aenter__(self):
+        if self._sockname is None:
+            await self.enable()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        pass
 
     async def _receive_task(self, reader, writer):
         debug("TCP receive_task Running")
@@ -121,21 +131,26 @@ class IngressTcpPort(Port):
             await self._packet_queue.put(_packet)
 
     async def enable(self):
-        await asyncio.start_server(
+        self._server = await asyncio.start_server(
             self._receive_task,
-            '127.0.0.1', # TODO bind to all addresses?
-            9000, # TODO find an available port
+            'localhost', # TODO bind to all addresses?
+            0,  # Let the OS find a free port
             loop=self._loop
         )
+        self._sockname = self._server.sockets[0].getsockname()
+
+    def getsockname(self):
+        return self._sockname
+
 
 class EgressTcpPort(Port):
 
-    def __init__(self, name, host, port, encoding, loop=None):
+    def __init__(self, name, encoding, loop=None):
         self.name = name
         self._loop = loop if loop else asyncio.get_event_loop()
         self._encoding = encoding
-        self._host = host
-        self._port = port
+        self._host = None
+        self._port = None
         self._send_queue = asyncio.Queue(loop=self._loop)
 
     def write(self, packet):
@@ -158,7 +173,9 @@ class EgressTcpPort(Port):
             else:
                 raise RuntimeError('Packet format type not supported')
 
-    async def enable(self):
+    async def enable(self, host, port):
+        self._host = host
+        self._port = port
         r, w = await asyncio.open_connection(
                 host=self._host,
                 port=self._port,

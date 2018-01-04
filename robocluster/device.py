@@ -7,7 +7,7 @@ from fnmatch import fnmatch
 from functools import wraps
 from threading import Thread
 
-from .util import duration_to_seconds, as_coroutine
+from .util import duration_to_seconds, as_coroutine, debug
 from .ports import MulticastPort, SerialPort, EgressTcpPort, IngressTcpPort
 
 class AttributeDict(dict):
@@ -33,6 +33,16 @@ class Device:
         """Initialize the device."""
         self.name = name
         self.events = defaultdict(list)
+
+        self.events['*SEND_REQUEST'].append({
+            'task': self.on_send_request,
+            'port': ['multicast']
+        })
+
+        self.events['*SEND_CONFIRM'].append({
+            'task': self.on_send_confirm,
+            'port': [self.name+'_tcp']
+        })
 
         self._thread = None
         self._loop = loop if loop else asyncio.new_event_loop()
@@ -138,16 +148,54 @@ class Device:
         self._loop.create_task(self.ports[device_name].enable())
 
     def create_egress_tcp(self, device_name, encoding='json'):
-        address = 'localhost'
-        port = 9000
         self.ports[device_name] = EgressTcpPort(
             name=device_name,
-            host=address,
-            port=port,
             encoding=encoding,
             loop=self._loop
         )
-        self._loop.create_task(self.ports[device_name].enable())
+        async def send_request():
+            async with self.ports[self.name+'_tcp'] as ingress:
+                sockname = ingress.getsockname()
+                await self.publish('SEND_REQUEST', {
+                    'requested-device': device_name,
+                    'sender-address': sockname[0],
+                    'sender-port': sockname[1],
+                    'sender-name': self.name,
+                    'encoding': encoding
+                })
+        self._loop.create_task(send_request())
+
+    async def on_send_request(self, event, data):
+        if data['requested-device'] == self.name:
+            sender_name = data['sender-name']
+            # Create a new egress port for the sender
+            self.ports[sender_name] = EgressTcpPort(
+                name=sender_name,
+                encoding=data['encoding'],
+                loop=self._loop
+            )
+            async with self.ports[self.name+'_tcp'] as ingress:
+                sockname = ingress.getsockname()
+                # enable the port to the sender
+                await self.ports[sender_name].enable(
+                    host=data['sender-address'],
+                    port=data['sender-port']
+                )
+                # Send them our connection information
+                await self.ports[sender_name].write({
+                    'event': 'SEND_CONFIRM',
+                    'data': {
+                        'name': self.name,
+                        'address': sockname[0],
+                        'port': sockname[1]
+                    }
+                })
+
+    async def on_send_confirm(self, event, data):
+        await self.ports[data['name']].enable(
+            host=data['address'],
+            port=data['port']
+        )
 
     def start(self):
         """Start device."""
