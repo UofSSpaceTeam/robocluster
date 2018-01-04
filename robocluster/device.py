@@ -8,7 +8,7 @@ from functools import wraps
 from threading import Thread
 
 from .util import duration_to_seconds, as_coroutine
-from .ports import MulticastPort, SerialPort, TcpPort
+from .ports import MulticastPort, SerialPort, EgressTcpPort, IngressTcpPort
 
 class AttributeDict(dict):
     """
@@ -43,6 +43,7 @@ class Device:
                 'multicast': MulticastPort(name, group, self.transport,
                     self._packet_queue, self._loop)
         }
+        self.create_ingress_tcp(self.name+'_tcp')
         self._loop.create_task(self.ports['multicast'].enable())
 
         self.__storage = AttributeDict()
@@ -127,17 +128,23 @@ class Device:
         )
         self._loop.create_task(self.ports[usb_path].enable())
 
-    def create_tcp(self, device_name, encoding='json'):
-        # find device ip, port
+    def create_ingress_tcp(self, device_name, encoding='json'):
+        self.ports[device_name] = IngressTcpPort(
+            name=device_name,
+            encoding=encoding,
+            packet_queue=self._packet_queue,
+            loop=self._loop
+        )
+        self._loop.create_task(self.ports[device_name].enable())
+
+    def create_egress_tcp(self, device_name, encoding='json'):
         address = 'localhost'
-        port=9000
-        # create TcpPort
-        self.ports[device_name] = TcpPort(
+        port = 9000
+        self.ports[device_name] = EgressTcpPort(
             name=device_name,
             host=address,
             port=port,
             encoding=encoding,
-            packet_queue=self._packet_queue,
             loop=self._loop
         )
         self._loop.create_task(self.ports[device_name].enable())
