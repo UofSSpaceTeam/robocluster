@@ -58,5 +58,5 @@ def test_every():
     sleep(0.04)
     device_a.stop()
     assert(counter == 2)
-    tolerance = 0.001
+    tolerance = 0.01
     assert(loop_delay - 0.01 < tolerance)
