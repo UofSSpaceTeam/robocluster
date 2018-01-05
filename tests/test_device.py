@@ -113,8 +113,7 @@ def test_request():
 
     @deviceA.on('*/request')
     async def reply(event, data):  # pylint: disable=W0612
-        sender = event.split('/')[0]
-        await deviceA.send(sender, 'request', TEST_DATA)
+        await deviceA.reply(event, TEST_DATA)
 
     @deviceB.task
     async def get_data():  # pylint: disable=W0612

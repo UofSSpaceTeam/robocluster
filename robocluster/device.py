@@ -79,6 +79,7 @@ class Device:
                 await self.ports[p].write(packet)
 
     async def send(self, dest, topic, data):
+        """Directly send <data> under <topic> to <dest>"""
         if dest not in self.ports:
             self.create_egress_tcp(dest)
         packet = {
@@ -88,15 +89,25 @@ class Device:
         await self.ports[dest].write(packet)
 
     async def request(self, dest, topic):
+        """Request data indicated by topic from dest."""
         event_name = '{}/{}'.format(dest, topic)
         await self.send(dest, topic, None)
         future = asyncio.Future(loop=self._loop)
         @self.on(event_name)
         async def return_data(event, data):  # pylint: disable=W0612
             future.set_result(data)
-            self.events[event_name] = None
+            self.events[event_name] = []
         await future
         return future.result()
+
+
+    async def reply(self, event, data):
+        """Reply to a request event."""
+        expanded = event.split('/')
+        sender = expanded[0]
+        request = ''.join(expanded[1:])
+        await self.send(sender, request, data)
+
 
     def on(self, event, ports=None):
         """Add a callback for an event."""
@@ -159,6 +170,7 @@ class Device:
         self._loop.create_task(self.ports[usb_path].enable())
 
     def create_ingress_tcp(self, device_name, encoding=transport):
+        """Create a new incomming tcp port."""
         self.ports[device_name] = IngressTcpPort(
             name=device_name,
             encoding=encoding,
@@ -168,6 +180,7 @@ class Device:
         self._loop.create_task(self.ports[device_name].enable())
 
     def create_egress_tcp(self, device_name, encoding=transport):
+        """Create a new tcp for outgoing data."""
         self.ports[device_name] = EgressTcpPort(
             name=device_name,
             encoding=encoding,

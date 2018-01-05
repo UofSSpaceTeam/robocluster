@@ -8,6 +8,7 @@ deviceB = Device('deviceB', 'rover')
 async def reply(event, data):
     sender = event.split('/')[0]
     await deviceA.send(sender, 'request', 1234)
+    await deviceA.reply(event, 1234)
 
 @deviceB.task
 async def get_data():
