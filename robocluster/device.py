@@ -78,6 +78,15 @@ class Device:
             for p in port:
                 await self.ports[p].write(packet)
 
+    async def send(self, dest, topic, data):
+        if dest not in self.ports:
+            self.create_egress_tcp(dest)
+        packet = {
+            'event': '{}/{}'.format(self.name, topic),
+            'data': data
+        }
+        await self.ports[dest].write(packet)
+
     def on(self, event, ports=None):
         """Add a callback for an event."""
         if isinstance(ports, str):
@@ -127,7 +136,7 @@ class Device:
                     if callback['port'] is None or packet['port'] in callback['port']:
                         self._loop.create_task(callback['task'](event, data))
 
-    def create_serial(self, usb_path, encoding='json'):
+    def create_serial(self, usb_path, encoding=transport):
         """Create a new SerialDevice."""
         self.ports[usb_path] = SerialPort(
             name=usb_path,
@@ -138,7 +147,7 @@ class Device:
         )
         self._loop.create_task(self.ports[usb_path].enable())
 
-    def create_ingress_tcp(self, device_name, encoding='json'):
+    def create_ingress_tcp(self, device_name, encoding=transport):
         self.ports[device_name] = IngressTcpPort(
             name=device_name,
             encoding=encoding,
@@ -147,7 +156,7 @@ class Device:
         )
         self._loop.create_task(self.ports[device_name].enable())
 
-    def create_egress_tcp(self, device_name, encoding='json'):
+    def create_egress_tcp(self, device_name, encoding=transport):
         self.ports[device_name] = EgressTcpPort(
             name=device_name,
             encoding=encoding,
