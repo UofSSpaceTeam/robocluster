@@ -41,7 +41,7 @@ class Device:
 
         self.events['*SEND_CONFIRM'].append({
             'task': self.on_send_confirm,
-            'port': [self.name+'_tcp']
+            'port': ['tcp']
         })
 
         self._thread = None
@@ -53,7 +53,7 @@ class Device:
                 'multicast': MulticastPort(name, group, self.transport,
                     self._packet_queue, self._loop)
         }
-        self.create_ingress_tcp(self.name+'_tcp')
+        self.create_ingress_tcp('tcp')
         self._loop.create_task(self.ports['multicast'].enable())
 
         self.__storage = AttributeDict()
@@ -174,7 +174,7 @@ class Device:
             loop=self._loop
         )
         async def send_request():
-            async with self.ports[self.name+'_tcp'] as ingress:
+            async with self.ports['tcp'] as ingress:
                 sockname = ingress.getsockname()
                 await self.publish('SEND_REQUEST', {
                     'requested-device': device_name,
@@ -194,7 +194,7 @@ class Device:
                 encoding=data['encoding'],
                 loop=self._loop
             )
-            async with self.ports[self.name+'_tcp'] as ingress:
+            async with self.ports['tcp'] as ingress:
                 sockname = ingress.getsockname()
                 # enable the port to the sender
                 await self.ports[sender_name].enable(
