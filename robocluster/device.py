@@ -92,7 +92,7 @@ class Device:
         await self.send(dest, topic, None)
         future = asyncio.Future(loop=self._loop)
         @self.on(event_name)
-        async def return_data(event, data):
+        async def return_data(event, data):  # pylint: disable=W0612
             future.set_result(data)
             self.events[event_name] = None
         await future

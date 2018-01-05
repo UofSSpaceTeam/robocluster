@@ -14,7 +14,7 @@ def test_serial_write():
     master, slave = pty.openpty()
 
     device = Device('test', 'tester')
-    sDevice = device.create_serial(os.ttyname(slave))
+    device.create_serial(os.ttyname(slave))
 
     TEST_DATA = {'test': 'value'}
 
@@ -35,7 +35,7 @@ def test_vesc_write():
     master, slave = pty.openpty()
 
     device = Device('test', 'tester')
-    sDevice = device.create_serial(os.ttyname(slave), encoding='vesc')
+    device.create_serial(os.ttyname(slave), encoding='vesc')
 
     TEST_MSG = 'Hello world'
     TEST_DATA = ExampleSendMessage(TEST_MSG)

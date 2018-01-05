@@ -1,6 +1,5 @@
 import asyncio
 import json
-import socket
 
 import pyvesc
 import serial_asyncio

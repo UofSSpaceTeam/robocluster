@@ -70,7 +70,7 @@ def test_send():
     TEST_DATA = {'key': 'Hello', 'values': 1234}
 
     @device_b.on('*/direct-msg')
-    async def callback(event, data):
+    async def callback(event, data):  # pylint: disable=W0612
         nonlocal message_received
         print('device_b got message')
         assert(event == 'device_a/direct-msg')
@@ -78,7 +78,7 @@ def test_send():
         message_received = True
 
     @device_a.task
-    async def send_msg():
+    async def send_msg():  # pylint: disable=W0612
         print('device_a sending message')
         await device_a.send('device_b', 'direct-msg', TEST_DATA)
 
@@ -96,7 +96,7 @@ def test_storage():
     device.storage.counter = 0
 
     @device.every('20ms')
-    async def increment():
+    async def increment():  # pylint: disable=W0612
         device.storage.counter += 1
 
     device.start()
@@ -112,12 +112,12 @@ def test_request():
     TEST_DATA = 1234
 
     @deviceA.on('*/request')
-    async def reply(event, data):
+    async def reply(event, data):  # pylint: disable=W0612
         sender = event.split('/')[0]
         await deviceA.send(sender, 'request', TEST_DATA)
 
     @deviceB.task
-    async def get_data():
+    async def get_data():  # pylint: disable=W0612
         data = await deviceB.request('deviceA', 'request')
         assert(data == TEST_DATA)
         print(data)
