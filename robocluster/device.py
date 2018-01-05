@@ -87,6 +87,17 @@ class Device:
         }
         await self.ports[dest].write(packet)
 
+    async def request(self, dest, topic):
+        event_name = '{}/{}'.format(dest, topic)
+        await self.send(dest, topic, None)
+        future = asyncio.Future(loop=self._loop)
+        @self.on(event_name)
+        async def return_data(event, data):
+            future.set_result(data)
+            self.events[event_name] = None
+        await future
+        return future.result()
+
     def on(self, event, ports=None):
         """Add a callback for an event."""
         if isinstance(ports, str):
