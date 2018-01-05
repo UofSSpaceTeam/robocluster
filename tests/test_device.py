@@ -60,3 +60,34 @@ def test_every():
     assert(counter == 2)
     tolerance = 0.01
     assert(loop_delay - 0.01 < tolerance)
+
+def test_send():
+    group = str(uuid4())
+    device_a = Device('device_a', group)
+    device_b = Device('device_b', group)
+    message_received = False
+
+    TEST_DATA = {'key': 'Hello', 'values': 1234}
+
+    @device_b.on('*/direct-msg')
+    async def callback(event, data):
+        nonlocal message_received
+        print('device_b got message')
+        assert(event == 'device_a/direct-msg')
+        assert(data == TEST_DATA)
+        message_received = True
+
+    @device_a.task
+    async def send_msg():
+        print('device_a sending message')
+        await device_a.send('device_b', 'direct-msg', TEST_DATA)
+
+    device_b.start()
+    device_a.start()
+    print('devices started')
+    sleep(0.03)
+    device_a.stop()
+    device_b.stop()
+    print('done sleep')
+    assert(message_received)
+
