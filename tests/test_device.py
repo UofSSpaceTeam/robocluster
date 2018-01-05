@@ -85,9 +85,49 @@ def test_send():
     device_b.start()
     device_a.start()
     print('devices started')
-    sleep(0.03)
+    sleep(0.05)
     device_a.stop()
     device_b.stop()
     print('done sleep')
     assert(message_received)
+
+def test_storage():
+    device = Device('device', 'test')
+    device.storage.counter = 0
+
+    @device.every('20ms')
+    async def increment():
+        device.storage.counter += 1
+
+    device.start()
+    sleep(0.11)
+    device.stop()
+    assert(device.storage.counter == 6)
+
+def test_request():
+    deviceA = Device('deviceA', 'rover')
+    deviceB = Device('deviceB', 'rover')
+    deviceB.storage.message_received = False
+
+    TEST_DATA = 1234
+
+    @deviceA.on('*/request')
+    async def reply(event, data):
+        sender = event.split('/')[0]
+        await deviceA.send(sender, 'request', TEST_DATA)
+
+    @deviceB.task
+    async def get_data():
+        data = await deviceB.request('deviceA', 'request')
+        assert(data == TEST_DATA)
+        print(data)
+        deviceB.storage.message_received = True
+
+    deviceA.start()
+    deviceB.start()
+    sleep(0.1)
+    deviceB.stop()
+    deviceA.stop()
+    assert(deviceB.storage.message_received)
+
 
