@@ -30,6 +30,32 @@ def test_serial_write():
     assert(json.loads(msg.decode('utf-8')) == TEST_DATA)
     device.stop()
 
+def test_serial_read():
+    master, slave = pty.openpty()
+
+    device = Device('test', 'tester')
+    device.create_serial(os.ttyname(slave))
+    device.storage.msg_received = False
+
+    TEST_DATA = {'test': 'value'}
+
+    @device.on('test')
+    async def callback(event, data):
+        assert(data == TEST_DATA)
+        print("Got data {}".format(data))
+        device.storage.msg_received = True
+
+    device.start()
+    time.sleep(0.1)
+    packet = {
+        'event': 'test',
+        'data': TEST_DATA
+    }
+    os.write(master, json.dumps(packet).encode('utf8'))
+    time.sleep(0.1)
+    device.stop()
+    assert(device.storage.msg_received)
+
 def test_vesc_write():
     # Same as test_serial_write but with vesc data
     master, slave = pty.openpty()
@@ -54,4 +80,4 @@ def test_vesc_write():
     device.stop()
 
 if __name__ ==  '__main__':
-    test_vesc_write()
+    test_serial_read()
