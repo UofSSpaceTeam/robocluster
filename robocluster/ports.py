@@ -40,6 +40,17 @@ class MulticastPort(Port):
     """Provides a high level wrapper for a multicast socket"""
 
     def __init__(self, name, group, encoding, packet_queue, loop=None):
+        """
+        Initialize a multicast port.
+
+        Args:
+            name (str): The name to identify the port by.
+            group (str): Used to generate the multicast address and port.
+            encoding (str): How to structure the data, json, utf8, etc.
+            packet_queue (asyncio.Queue): Queue to put incomming messages into.
+            loop (asyncio.AbstractEventLoop, optional):
+                The event loop to run on. Defaults to the current event loop.
+        """
         self.name = name
         self._loop = loop if loop else asyncio.get_event_loop()
         self._packet_queue = packet_queue
@@ -83,8 +94,22 @@ class MulticastPort(Port):
             await self._packet_queue.put(packet)
 
 class IngressTcpPort(Port):
+    """Wrapper for a TCP socket for incomming connections.
+
+    Provides an asynchronous context manager interface.
+    """
 
     def __init__(self, name, encoding, packet_queue, loop=None):
+        """
+        Initialize an ingress TCP port.
+
+        Args:
+            name (str): The name to identify the port by.
+            encoding (str): How to structure the data, json, utf8, etc.
+            packet_queue (asyncio.Queue): Queue to put incomming messages into.
+            loop (asyncio.AbstractEventLoop, optional):
+                The event loop to run on. Defaults to the current event loop.
+        """
         self.name = name
         self._loop = loop if loop else asyncio.get_event_loop()
         self._packet_queue = packet_queue
@@ -100,6 +125,7 @@ class IngressTcpPort(Port):
         pass
 
     async def _receive_task(self, reader, writer):
+        """Receive packets from the network and submit them to the device."""
         debug("TCP receive_task Running")
         while True:
             _packet = {}
@@ -130,6 +156,7 @@ class IngressTcpPort(Port):
             await self._packet_queue.put(_packet)
 
     async def enable(self):
+        """Enable the port and start the receive_task."""
         self._server = await asyncio.start_server(
             self._receive_task,
             'localhost', # TODO bind to all addresses?
@@ -139,12 +166,23 @@ class IngressTcpPort(Port):
         self._sockname = self._server.sockets[0].getsockname()
 
     def getsockname(self):
+        """Returns information about the socket connection."""
         return self._sockname
 
 
 class EgressTcpPort(Port):
+    """Wrapper for a TCP socket for outgoing connections."""
 
     def __init__(self, name, encoding, loop=None):
+        """
+        Initialize the port.
+
+        Args:
+            name (str): The name to identify the port by.
+            encoding (str): How to structure the data, json, utf8, etc.
+            loop (asyncio.AbstractEventLoop, optional):
+                The event loop to run on. Defaults to the current event loop.
+        """
         self.name = name
         self._loop = loop if loop else asyncio.get_event_loop()
         self._encoding = encoding
@@ -153,10 +191,16 @@ class EgressTcpPort(Port):
         self._send_queue = asyncio.Queue(loop=self._loop)
 
     def write(self, packet):
+        """
+        Schedule a new packet to be sent. This doesn't return once
+        the packet is actually sent, it just puts it on a queue
+        for the send_task to send it as soon as it's ready.
+        """
         debug("Egress TCP Submitting packet to send: {}".format(packet))
         return self._send_queue.put(packet)
 
     async def _send_task(self):
+        """Write packets to the tcp socket."""
         if not self._writer:
             raise RuntimeError("Egress TCP writer not initialized yet")
         debug("Egress TCP Send task running")
@@ -173,6 +217,7 @@ class EgressTcpPort(Port):
                 raise RuntimeError('Packet format type not supported')
 
     async def enable(self, host, port):
+        """Enable the port and start the send_task."""
         self._host = host
         self._port = port
         r, w = await asyncio.open_connection(
@@ -185,8 +230,19 @@ class EgressTcpPort(Port):
         self._loop.create_task(self._send_task())
 
 class SerialPort(Port):
+    """Wrapper for USB or USRT serial connections."""
 
     def __init__(self, name, group, encoding, loop, packet_queue):
+        """
+        Initialize the serial port.
+
+        Args:
+            name (str): The name to identify the port by.
+            group (str): unused, please remove...
+            encoding (str): How to structure the data, json, vesc, etc.
+            loop (asyncio.AbstractEventLoop): The event loop to run on.
+            packet_queue (asyncio.Queue): Queue to put incomming messages into.
+        """
         self.name = name
         self._loop = loop
         self._packet_queue = packet_queue
@@ -198,7 +254,7 @@ class SerialPort(Port):
         self._send_queue = asyncio.Queue(loop=self._loop)
 
     async def _init_serial(self):
-        """Enter async context manager."""
+        """Initialize the StreamReader and StreamWriter."""
         r, w = await serial_asyncio.open_serial_connection(
             loop=self._loop,
             url=self._usb_path,

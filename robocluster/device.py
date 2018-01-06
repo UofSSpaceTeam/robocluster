@@ -30,17 +30,27 @@ class Device:
     transport = 'json'
 
     def __init__(self, name, group, loop=None):
-        """Initialize the device."""
+        """
+        Initialize the device.
+
+        Args:
+            name (str): A name to identify the device by.
+            group (str): Used to select the multicast address.
+                In order for devices to talk to each other,
+                they must be in the same group.
+            loop (asyncio.AbstractEventLoop, optional): Event loop to use.
+                Defaults to the current event loop.
+        """
         self.name = name
         self.events = defaultdict(list)
 
         self.events['*SEND_REQUEST'].append({
-            'task': self.on_send_request,
+            'task': self._on_send_request,
             'port': ['multicast']
         })
 
         self.events['*SEND_CONFIRM'].append({
-            'task': self.on_send_confirm,
+            'task': self._on_send_confirm,
             'port': ['tcp']
         })
 
@@ -60,11 +70,28 @@ class Device:
 
     @property
     def storage(self):
-        """Local device storage"""
+        """
+        Local device storage.
+        Use it to store arbitrary data that can be accessed
+        from multiple tasks or callbacks.
+        """
         return self.__storage
 
     async def publish(self, topic, data, port='multicast'):
-        """Publish to topic."""
+        """
+        Publish to topic.
+
+        Args:
+            topic (str): The topic, or event name to broadcast.
+            data: Any arbitrary data that can be encoded and sent
+                over the network. For the default json encoding,
+                dictionaries are a good way to package data.
+            port (str, list, optional): Specify which ports to publish to.
+                Ports are identified by their name as a string.
+                You can also provide a list of port names to
+                publish over multiple ports.
+                Defaults to 'multicast'.
+        """
         packet = {
             'event': '{}/{}'.format(self.name, topic),
             'data': data,
@@ -79,7 +106,18 @@ class Device:
                 await self.ports[p].write(packet)
 
     async def send(self, dest, topic, data):
-        """Directly send <data> under <topic> to <dest>"""
+        """
+        Directly send data to another device.
+        If the device does not have a EgressTcpPort for <dest>
+        yet, it will create one before sending.
+
+        Args:
+            dest (str): The device name to send to.
+            topic (str): The topic or event name to send.
+            data: Any arbitrary data that can be encoded and sent
+                over the network. For the default json encoding,
+                dictionaries are a good way to package data.
+        """
         if dest not in self.ports:
             self.create_egress_tcp(dest)
         packet = {
@@ -89,7 +127,16 @@ class Device:
         await self.ports[dest].write(packet)
 
     async def request(self, dest, topic):
-        """Request data indicated by topic from dest."""
+        """
+        Request data from another device.
+
+        Args:
+            dest (str): The device name to request data from.
+            topic (str): The topic or event name to request.
+
+        Return:
+            The data that you requested.
+        """
         event_name = '{}/{}'.format(dest, topic)
         await self.send(dest, topic, None)
         future = asyncio.Future(loop=self._loop)
@@ -102,7 +149,15 @@ class Device:
 
 
     async def reply(self, event, data):
-        """Reply to a request event."""
+        """
+        Reply to a request event.
+
+        Args:
+            event (str): The event that triggered the request.
+            data: Any arbitrary data that can be encoded and sent
+                over the network. For the default json encoding,
+                dictionaries are a good way to package data.
+        """
         expanded = event.split('/')
         sender = expanded[0]
         request = ''.join(expanded[1:])
@@ -110,7 +165,29 @@ class Device:
 
 
     def on(self, event, ports=None):
-        """Add a callback for an event."""
+        """
+        Add a callback for an event.
+        This is a decorator function and should be applied to a coroutine.
+        The coroutine should take two parameter, event and data,
+        where event is a string that represents the exact event name
+        that triggered the callback, and data is the arbitrary data
+        that sent as part of the message.
+        Example::
+
+            @device.on('other-device/hello')
+            async def callback(event, data):
+                print(event, data)
+
+        Args:
+            event (str): The event name to react to.
+                You can use file globbing syntax to subscribe
+                to multiple events: '*/heartbeat', 'important/*'
+            port (str, list, optional): Specify which ports to listen over.
+                Ports are identified by their name as a string.
+                You can also provide a list of port names to
+                listen to multiple ports.
+                Defaults to None, which listens to all ports.
+        """
         if isinstance(ports, str):
             ports = [ports]
         def _decorator(callback):
@@ -123,13 +200,39 @@ class Device:
         return _decorator
 
     def task(self, task):
-        """Create a background task."""
+        """
+        Create a background task.
+
+        This is a decorator function and can be used as follows::
+
+            @device.task
+            async def setup_task():
+                ...
+
+        This would register the setup_task coroutine to be ran
+        by the device when the device is started.
+        """
         coro = as_coroutine(task)
         self._loop.create_task(coro())
         return task
 
     def every(self, duration):
-        """Create a background task that runs every duration."""
+        """
+        Create a background task that runs every duration.
+        Equivilent to::
+
+            @device.task
+            async def loop():
+                while True:
+                    # do things
+                    ...
+                    device.sleep(duration)
+
+        Args:
+            duration (str, int): How long to sleep in between loops.
+                Takes the same form as :func:`~robocluster.util.duration_to_seconds`.
+
+        """
         def _decorator(func):
             @wraps(func)
             async def _wrapper():
@@ -142,11 +245,17 @@ class Device:
         return _decorator
 
     def sleep(self, duration):
-        """Sleep the device."""
+        """
+        Sleep the device.
+
+        Args:
+            duration (str, int): How long to sleep for.
+                Takes the same format as :func:`~robocluster.util.duration_to_seconds`.
+        """
         seconds = duration_to_seconds(duration)
         return asyncio.sleep(seconds, loop=self._loop)
 
-    async def callback_handler(self):
+    async def _callback_handler(self):
         """Recieve packets and call the appropriate callbacks."""
         while True:
             packet = await self._packet_queue.get()
@@ -198,7 +307,13 @@ class Device:
                 })
         self._loop.create_task(send_request())
 
-    async def on_send_request(self, event, data):
+    async def _on_send_request(self, event, data):
+        """
+        Callback for the SEND_REQUEST event.
+        If another device is looking for this device,
+        this callback connects to the other device and
+        sends it the information on how to contact this device.
+        """
         if data['requested-device'] == self.name:
             sender_name = data['sender-name']
             # Create a new egress port for the sender
@@ -224,7 +339,11 @@ class Device:
                     }
                 })
 
-    async def on_send_confirm(self, event, data):
+    async def _on_send_confirm(self, event, data):
+        """
+        Callback for the SEND_CONFIRM event.
+        Enables a port that was waiting for a tcp address.
+        """
         await self.ports[data['name']].enable(
             host=data['address'],
             port=data['port']
@@ -242,7 +361,7 @@ class Device:
         loop = self._loop
         asyncio.set_event_loop(loop)
 
-        loop.create_task(self.callback_handler())
+        loop.create_task(self._callback_handler())
         loop.run_forever()
 
         for task in asyncio.Task.all_tasks(loop=loop):
