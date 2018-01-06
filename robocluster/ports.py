@@ -113,7 +113,7 @@ class IngressTcpPort(Port):
         self.name = name
         self._loop = loop if loop else asyncio.get_event_loop()
         self._packet_queue = packet_queue
-        self._encoding = encoding
+        self.encoding = encoding
         self._sockname = None  # Connection information address:port
 
     async def __aenter__(self):
@@ -129,7 +129,7 @@ class IngressTcpPort(Port):
         debug("TCP receive_task Running")
         while True:
             _packet = {}
-            if self._encoding == 'json':
+            if self.encoding == 'json':
                 pkt = ''
                 curleystack = 0
                 squarestack = 0
@@ -185,7 +185,7 @@ class EgressTcpPort(Port):
         """
         self.name = name
         self._loop = loop if loop else asyncio.get_event_loop()
-        self._encoding = encoding
+        self.encoding = encoding
         self._host = None
         self._port = None
         self._send_queue = asyncio.Queue(loop=self._loop)
@@ -207,11 +207,11 @@ class EgressTcpPort(Port):
         while True:
             packet = await self._send_queue.get()
             debug("Egress TCP Sending packet {}".format(packet))
-            if self._encoding == 'raw':
+            if self.encoding == 'raw':
                 await self._writer.write(packet)
-            elif self._encoding == 'utf8':
+            elif self.encoding == 'utf8':
                 await self._writer.write(packet.encode())
-            elif self._encoding == 'json':
+            elif self.encoding == 'json':
                 self._writer.write(json.dumps(packet).encode())
             else:
                 raise RuntimeError('Packet format type not supported')
@@ -249,7 +249,7 @@ class SerialPort(Port):
         self._packet_queue = packet_queue
         self._reader = None  # once initialized, an asyncio.StreamReader
         self._writer = None  # once initialized, an asyncio.StreamWriter
-        self._encoding = encoding
+        self.encoding = encoding
         self._usb_path = name
         self._baudrate = 115200
         self._send_queue = asyncio.Queue(loop=self._loop)
@@ -284,13 +284,13 @@ class SerialPort(Port):
         while True:
             packet = await self._send_queue.get()
             debug("Sending packet {}".format(packet))
-            if self._encoding == 'raw':
+            if self.encoding == 'raw':
                 await self._writer.write(packet)
-            elif self._encoding == 'utf8':
+            elif self.encoding == 'utf8':
                 await self._writer.write(packet.encode())
-            elif self._encoding == 'json':
+            elif self.encoding == 'json':
                 await self._writer.write(json.dumps(packet).encode())
-            elif self._encoding == 'vesc':
+            elif self.encoding == 'vesc':
                 # I don't know why I can't await the _writer in
                 # this context, but can in others...
                 self._writer.write(pyvesc.encode(packet))
@@ -304,7 +304,7 @@ class SerialPort(Port):
         debug("Serial Receive task running")
         while True:
             _packet = {}
-            if self._encoding == 'json':
+            if self.encoding == 'json':
                 pkt = ''
                 curleystack = 0
                 squarestack = 0
@@ -324,7 +324,7 @@ class SerialPort(Port):
                     if curleystack == 0 and squarestack == 0:
                         done_reading = True
                 _packet = json.loads(pkt)
-            elif self._encoding == 'vesc':
+            elif self.encoding == 'vesc':
                 # Taken from Roveberrypy
                 def to_int(b):
                     return int.from_bytes(b, byteorder='big')
@@ -339,6 +339,8 @@ class SerialPort(Port):
                     'event': msg.__class__.__name__,
                     'data': msg
                 }
+            else:
+                raise RuntimeError('Encoding is not supported')
             _packet['port'] = self.name
             debug("Got packet {}".format(_packet))
             await self._packet_queue.put(_packet)
