@@ -232,7 +232,7 @@ class EgressTcpPort(Port):
 class SerialPort(Port):
     """Wrapper for USB or USRT serial connections."""
 
-    def __init__(self, name, group, encoding, loop, packet_queue):
+    def __init__(self, name, encoding, packet_queue, loop=None):
         """
         Initialize the serial port.
 
@@ -240,11 +240,12 @@ class SerialPort(Port):
             name (str): The name to identify the port by.
             group (str): unused, please remove...
             encoding (str): How to structure the data, json, vesc, etc.
-            loop (asyncio.AbstractEventLoop): The event loop to run on.
             packet_queue (asyncio.Queue): Queue to put incomming messages into.
+            loop (asyncio.AbstractEventLoop, optional):
+                The event loop to run on. Defaults to the current event loop.
         """
         self.name = name
-        self._loop = loop
+        self._loop = loop if loop else asyncio.get_event_loop()
         self._packet_queue = packet_queue
         self._reader = None  # once initialized, an asyncio.StreamReader
         self._writer = None  # once initialized, an asyncio.StreamWriter
