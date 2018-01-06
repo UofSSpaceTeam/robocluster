@@ -3,6 +3,7 @@ import json
 
 import pyvesc
 import serial_asyncio
+import serial
 
 from .net import Socket, key_to_multicast
 from .util import debug
@@ -256,13 +257,17 @@ class SerialPort(Port):
 
     async def _init_serial(self):
         """Initialize the StreamReader and StreamWriter."""
-        r, w = await serial_asyncio.open_serial_connection(
-            loop=self._loop,
-            url=self._usb_path,
-            baudrate=self._baudrate
-        )
-        self._reader, self._writer = r, w
-        debug("Serial reader and writer initialized")
+        try:
+            r, w = await serial_asyncio.open_serial_connection(
+                loop=self._loop,
+                url=self._usb_path,
+                baudrate=self._baudrate
+            )
+            self._reader, self._writer = r, w
+            debug("Serial reader and writer initialized")
+        except :
+            print('USB path not found')
+            await asyncio.sleep(0.2)
 
     async def read(self):
         """Read a single byte from the serial device."""
@@ -303,47 +308,53 @@ class SerialPort(Port):
             raise RuntimeError("Serial reader not initialized yet")
         debug("Serial Receive task running")
         while True:
-            _packet = {}
-            if self.encoding == 'json':
-                pkt = ''
-                curleystack = 0
-                squarestack = 0
-                done_reading = False
-                while not done_reading:
-                    b = await self._reader.read(1)
-                    b = b.decode()
-                    if b == '{':
-                        curleystack += 1
-                    elif b == '}':
-                        curleystack -= 1
-                    elif b == '[':
-                        squarestack += 1
-                    elif b == ']':
-                        squarestack -= 1
-                    pkt += b
-                    if curleystack == 0 and squarestack == 0:
-                        done_reading = True
-                _packet = json.loads(pkt)
-            elif self.encoding == 'vesc':
-                # Taken from Roveberrypy
-                def to_int(b):
-                    return int.from_bytes(b, byteorder='big')
-                header = await self._reader.read(1)
-                # magic VESC header must be 2 or 3
-                if not to_int(header) == 2 or to_int(header) == 3:
-                    continue  # raise error maybe?
-                length = await self._reader.read(to_int(header) - 1)
-                packet = await self._reader.read(to_int(length) + 4)
-                msg, _ = pyvesc.decode(header + length + packet)
-                _packet = {
-                    'event': msg.__class__.__name__,
-                    'data': msg
-                }
-            else:
-                raise RuntimeError('Encoding is not supported')
-            _packet['port'] = self.name
-            debug("Got packet {}".format(_packet))
-            await self._packet_queue.put(_packet)
+            try:
+                _packet = {}
+                if self.encoding == 'json':
+                    pkt = ''
+                    curleystack = 0
+                    squarestack = 0
+                    done_reading = False
+                    while not done_reading:
+                        b = await self._reader.read(1)
+                        b = b.decode()
+                        if b == '{':
+                            curleystack += 1
+                        elif b == '}':
+                            curleystack -= 1
+                        elif b == '[':
+                            squarestack += 1
+                        elif b == ']':
+                            squarestack -= 1
+                        pkt += b
+                        if curleystack == 0 and squarestack == 0:
+                            done_reading = True
+                    _packet = json.loads(pkt)
+                elif self.encoding == 'vesc':
+                    # Taken from Roveberrypy
+                    def to_int(b):
+                        return int.from_bytes(b, byteorder='big')
+                    header = await self._reader.read(1)
+                    # magic VESC header must be 2 or 3
+                    if not to_int(header) == 2 or to_int(header) == 3:
+                        continue  # raise error maybe?
+                    length = await self._reader.read(to_int(header) - 1)
+                    packet = await self._reader.read(to_int(length) + 4)
+                    msg, _ = pyvesc.decode(header + length + packet)
+                    _packet = {
+                        'event': msg.__class__.__name__,
+                        'data': msg
+                    }
+                else:
+                    raise RuntimeError('Encoding is not supported')
+                _packet['port'] = self.name
+                debug("Got packet {}".format(_packet))
+                await self._packet_queue.put(_packet)
+            except serial.serialutil.SerialException:
+                print('serial disconnect')
+                self._reader = None
+                while self._reader == None:
+                    await self._init_serial()
 
     async def enable(self):
         """
