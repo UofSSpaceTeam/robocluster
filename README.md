@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/UofSSpaceTeam/robocluster.svg?branch=dev)](https://travis-ci.org/UofSSpaceTeam/robocluster)
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/cbfd0fa1a8c64f9ea122553adfe32582)](https://www.codacy.com/app/UofSSpaceTeam/robocluster?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=UofSSpaceTeam/robocluster&amp;utm_campaign=Badge_Grade)
-[![Documentation Status](http://readthedocs.org/projects/robocluster/badge/?version=dev)](http://robocluster.readthedocs.io/en/dev/?badge=dev)
+[![Documentation Status](http://readthedocs.org/projects/robocluster/badge/?version=latest)](http://robocluster.readthedocs.io/en/latest/?badge=latest)
 [![Coverage Status](https://coveralls.io/repos/github/UofSSpaceTeam/robocluster/badge.svg?branch=dev)](https://coveralls.io/github/UofSSpaceTeam/robocluster?branch=dev)
 
 This is a library that will hopefully power the communication for the USST's mars rover,
