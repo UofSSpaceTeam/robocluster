@@ -6,6 +6,7 @@ import serial
 import serial_asyncio
 
 from .base import Port
+from ..util import debug
 
 
 class SerialPort(Port):

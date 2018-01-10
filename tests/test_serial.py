@@ -80,4 +80,4 @@ def test_vesc_write():
     device.stop()
 
 if __name__ ==  '__main__':
-    test_serial_read()
+    test_serial_write()
