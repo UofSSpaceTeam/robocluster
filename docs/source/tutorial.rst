@@ -166,6 +166,80 @@ new deviceC that does the printing of the final message to the console.
 Then modify deviceA to randomly choose between "Hello {}" and "Goodbye {}".
 
 
+Serial Device Communication
+---------------------------
+
+Now we'll look at how to talk to a serial device with robocluster.
+This will likely change in the future as we port some of the functionality
+of robocluster for microcontrollers, but for now we will just go over the
+``serial_test.py`` found in the examples folder in the robocluster repo.
+For this you will need an Arduino with the following code on it:
+
+::
+
+    #include <Arduino.h>
+    #include <ArduinoJson.h>
+
+    StaticJsonBuffer<200> jsonBuffer;
+    JsonObject& root = jsonBuffer.createObject();
+
+    void send_message() {
+        root.printTo(Serial);
+    }
+
+    void setup() {
+        pinMode(13, OUTPUT);
+        Serial.begin(115200);
+        root["event"] = "test";
+        JsonObject& nested = root.createNestedObject("data");
+        nested["key1"] = 42;
+        root["data"] = nested;
+    }
+
+    void loop() {
+        send_message();
+        digitalWrite(13, HIGH);
+        delay(500);
+        digitalWrite(13, LOW);
+        delay(500);
+        // while(!Serial.available()){}
+        // Serial.read();
+    }
+
+This just sends a json packet over serial every second that looks like this::
+
+    {
+        'event': 'test',
+        'data' : {'key1': 42}
+    }
+
+Once this is flashed
+to your Arduino, lets create a device on the python side and set up the serial port::
+
+    from robocluster import Device
+
+    device = Device('link', 'rover')
+    device.create_serial('/dev/ttyACM0')
+
+``device.create_serial()`` takes in the path to the serial device on Posix systems,
+or the com port on Windows. Change the path to correspond to the Arduino attached
+to your machine. When you call ``device.run()`` it will setup a connection
+to the serial device. Next we define a callback to trigger when ever the
+Arduino sends its message::
+
+    @device.on('test')
+    async def callback(event, data):
+        '''Print the event and value'''
+        print(event, data)
+
+Finaly, add::
+
+    device.run()
+
+and run the script. You should see the event and data printed to the console.
+
+TODO: Add stuff for writing to serial.
+
 .. _IP Multicast: https://en.wikipedia.org/wiki/IP_multicast
 .. _Python asyncio home: https://docs.python.org/3/library/asyncio.html
 .. _Python Tasks and coroutines: https://docs.python.org/3/library/asyncio-task.html
