@@ -102,7 +102,7 @@ def test_storage():
     device.start()
     sleep(0.11)
     device.stop()
-    assert(device.storage.counter == 6)
+    assert(device.storage.counter in (5, 6))  # 5 or 6 due to uncertain timing
 
 def test_request():
     deviceA = Device('deviceA', 'rover')
