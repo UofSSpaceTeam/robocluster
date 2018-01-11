@@ -312,7 +312,16 @@ Finally, add::
 
 and run the script. You should see the event and data printed to the console.
 
-TODO: Add stuff for writing to serial.
+To write to serial you have a couple of options. To write data strait to
+the device without the device wrapping the message in the whole 'event' and 'data'
+packet thing, use::
+
+    device.ports['name-of-serial'].write(<the_data>)
+
+If the serial device supports the packet structure that the robocluster device
+uses, you can use::
+
+    device.send('serial-name', 'some-event', <the_data>)
 
 .. _IP Multicast: https://en.wikipedia.org/wiki/IP_multicast
 .. _Python asyncio home: https://docs.python.org/3/library/asyncio.html
