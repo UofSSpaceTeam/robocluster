@@ -5,17 +5,15 @@ devices with one Device event loop
 from robocluster import Device
 
 device = Device('link', 'rover')
-micro = device.create_serial('/dev/ttyACM0')
-teensy = device.create_serial('/dev/ttyACM1')
-print(micro)
-print(teensy)
+device.create_serial('/dev/ttyACM0')
+device.create_serial('/dev/ttyACM1')
 
-@micro.on('micro')
+@device.on('micro')
 async def micro_callback(event, data):
     '''Callback for serial device 1'''
     print(event, data)
 
-@teensy.on('teensy')
+@device.on('teensy')
 async def teensy_callback(event, data):
     '''Callback for serial device 2'''
     print(event, data)

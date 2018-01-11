@@ -34,7 +34,7 @@ setup(name='robocluster',
           'pyvesc'
       ],
       dependency_links=[
-          'https://github.com/UofSSpaceTeam/PyVESC.git'
+          'git+https://github.com/UofSSpaceTeam/PyVESC.git#egg=PyVESC'
       ],
       zip_safe=False,
       tests_require=['pytest', 'coverage', 'pytest-cov'],

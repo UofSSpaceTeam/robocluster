@@ -10,6 +10,7 @@ Welcome to robocluster's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   tutorial
    robocluster
 
 

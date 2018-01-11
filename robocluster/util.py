@@ -57,3 +57,16 @@ def duration_to_seconds(duration):
             pass
 
     return value
+
+DEBUG = False
+
+def debug(msg):
+    """
+    Print msg if DEBUG is True. Usefull for debugging what
+    the Robocluster internals are doing. To enable debug messages
+    include the following in your program that uses devices::
+
+        import robocluster.util; robocluster.util.DEBUG = True
+    """
+    if DEBUG:
+        print(msg)
