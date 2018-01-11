@@ -7,7 +7,7 @@ from fnmatch import fnmatch
 from functools import wraps
 from threading import Thread
 
-from .util import duration_to_seconds, as_coroutine, debug
+from .util import duration_to_seconds, as_coroutine
 from .ports import MulticastPort, SerialPort, EgressTcpPort, IngressTcpPort
 
 class AttributeDict(dict):

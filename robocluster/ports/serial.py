@@ -44,7 +44,7 @@ class SerialPort(Port):
             )
             self._reader, self._writer = r, w
             debug("Serial reader and writer initialized")
-        except :
+        except serial.serialutil.SerialException:
             print('USB path not found')
             await asyncio.sleep(0.2)
 

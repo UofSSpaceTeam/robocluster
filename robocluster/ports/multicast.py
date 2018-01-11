@@ -1,5 +1,4 @@
 import asyncio
-import json
 
 from .base import Port
 from ..net import Socket, key_to_multicast
