@@ -165,6 +165,80 @@ change deviceB to publish the modified string it got from deviceA, and create a
 new deviceC that does the printing of the final message to the console.
 Then modify deviceA to randomly choose between "Hello {}" and "Goodbye {}".
 
+Sending Data Directly
+---------------------
+
+For messages that contain a lot of data or are sent at a high frequency,
+it is probably not a good idea to broadcast that to every device on the network.
+In this case it is more useful to send the message directly to the target device.
+Currently ``send`` uses TCP to transmit data, in the future we hope to integrate
+USB Serial communication with the send function.
+Lets create two devices::
+
+    device_a = Device('device_a', 'rover')
+    device_b = Device('device_b', 'rover')
+
+Create a callback on device_b for "direct-msg" from any device::
+
+    @device_b.on('*/direct-msg')
+    async def callback(event, data):
+        print('device_b got message: {}'.format(data))
+
+Create a periodic task for device_a that sends a number to device_b::
+
+    @device_a.every('1s')
+    async def transmit():
+        await device_a.send('device_b', 'direct-msg', 1234)
+
+And start the devices::
+
+    try:
+        device_a.start()
+        device_b.start()
+        device_a.wait()
+        device_b.wait()
+    except KeyboardInterrupt:
+        device_a.stop()
+        device_b.stop()
+
+The ``device.send()`` method takes 3 parameters, the first is the name
+of the device that you are sending to, the second is a data identifier
+just like the publish method, and the third parameter is the data its self.
+
+Request Data from a device
+---------------------------
+
+You can also request data directly from another device.
+
+Lets create two devices::
+
+    deviceA = Device('deviceA', 'rover')
+    deviceB = Device('deviceB', 'rover')
+
+And set up deviceA to reply to the "request" event with some data::
+
+    @deviceA.on('*/request')
+    async def reply(event, data):
+        await deviceA.reply(event, 1234)
+
+Then set up deviceB to request the data every second::
+
+    @deviceB.every('1s')
+    async def get_data():
+        data = await deviceB.request('deviceA', 'request')
+        print(data)
+
+And finally run the devices::
+
+    try:
+        deviceA.start()
+        deviceB.start()
+        deviceA.wait()
+        deviceB.wait()
+    except KeyboardInterrupt:
+        deviceA.stop()
+        deviceB.stop()
+
 
 Serial Device Communication
 ---------------------------
@@ -232,7 +306,7 @@ Arduino sends its message::
         '''Print the event and value'''
         print(event, data)
 
-Finaly, add::
+Finally, add::
 
     device.run()
 
