@@ -26,6 +26,11 @@ At some point (soon?) we'll put this on PyPi, but for now you can install robocl
 
 ## Contributing
 Create a branch off of `dev` and make changes from there.
-When your change is done, and you want feedback, submit a pull request,
+When your change is done, and you want feedback, submit a pull request to merge your branch into `dev`,
 and someone will review your code and merge it if it's ready.
+The `master` branch is sort of being used to mark major stable versions.
 
+## Tests
+The test suite is set up so that you can run `python setup.py test` to run the tests
+with coverage statistics. You can also run the tests by themselves with `pytest tests`
+(assuming you have pytest installed through pip).
