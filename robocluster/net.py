@@ -73,13 +73,16 @@ class AsyncSocket:
         @wraps(func)
         def wrapper(*args, **kwargs):
             remover(fd)
+            if future.cancelled():
+                return
             try:
                 result = func(*args, **kwargs)
-                future.set_result(result)
             except (BlockingIOError, InterruptedError):
-                adder(fd, partial(func, *args, **kwargs))
+                adder(fd, partial(wrapper, *args, **kwargs))
             except Exception as exc:
                 future.set_exception(exc)
+            else:
+                future.set_result(result)
             return future
         return wrapper
 
