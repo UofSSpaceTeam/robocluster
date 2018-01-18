@@ -2,7 +2,6 @@ import asyncio
 import json
 
 from .base import Port
-from ..net import Socket
 from ..util import debug
 
 
