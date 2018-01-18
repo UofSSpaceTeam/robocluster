@@ -1,5 +1,4 @@
 import asyncio
-import json
 import socket as socket_m
 from functools import partial, wraps
 from hashlib import sha256
@@ -7,9 +6,6 @@ from hashlib import sha256
 
 __all__ = [
     'AsyncSocket',
-    'MulticastSender',
-    'MulticastReceiver',
-    'MulticastTranceiver',
     'key_to_multicast',
 ]
 
@@ -89,80 +85,6 @@ class AsyncSocket:
                 future.set_result(result)
             return future
         return wrapper
-
-
-class MulticastSender:
-    def __init__(self, group, port, loop=None):
-        self._group = group
-        self._port = port
-
-        self._socket = AsyncSocket(
-            socket_m.AF_INET,
-            socket_m.SOCK_DGRAM,
-            loop=loop
-        )
-
-    async def send(self, packet):
-        data = json.dumps(packet).encode()
-        return await self._socket.sendto(data, (self._group, self._port))
-
-    def close(self):
-        self._socket.close()
-
-
-class MulticastReceiver:
-    def __init__(self, group, port, loop=None):
-        self._group = group
-        self._port = port
-
-        self._socket = AsyncSocket(
-            socket_m.AF_INET,
-            socket_m.SOCK_DGRAM,
-            loop=loop
-        )
-        self._socket.setsockopt(socket_m.SOL_SOCKET, socket_m.SO_REUSEADDR, 1)
-        self._socket.setsockopt(socket_m.SOL_SOCKET, socket_m.SO_REUSEPORT, 1)
-        self._socket.bind(('0.0.0.0', self._port))
-        self._socket.setsockopt(socket_m.IPPROTO_IP, socket_m.IP_MULTICAST_TTL, 2)
-        self._socket.setsockopt(socket_m.IPPROTO_IP, socket_m.IP_MULTICAST_LOOP, 1)
-        self._socket.setsockopt(
-            socket_m.IPPROTO_IP, socket_m.IP_ADD_MEMBERSHIP,
-            socket_m.inet_aton(self._group) + socket_m.inet_aton('0.0.0.0')
-        )
-
-    async def receive(self):
-        data, addr = await self._socket.recvfrom(1024)
-        try:
-            packet = json.loads(data.decode())
-            return packet, addr
-        except JSONDecodeError:
-            return None, addr
-
-    def close(self):
-        self._socket.setsockopt(
-            socket_m.IPPROTO_IP, socket_m.IP_DROP_MEMBERSHIP,
-            socket_m.inet_aton(self._group) + socket_m.inet_aton('0.0.0.0')
-        )
-        self._socket.close()
-
-
-class MulticastTranceiver:
-    def __init__(self, group, port, loop=None):
-        self._group = group
-        self._port = port
-
-        self._sender = MulticastSender(group, port, loop=loop)
-        self._receiver = MulticastReceiver(group, port, loop=loop)
-
-    async def send(self, data):
-        return await self._sender.send(data)
-
-    async def receive(self):
-        return await self._receiver.receive()
-
-    def close(self):
-        self._sender.close()
-        self._receiver.close()
 
 
 def key_to_multicast(key):
