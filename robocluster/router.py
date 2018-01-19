@@ -200,11 +200,16 @@ class Connection:
 
 
 class Router:
-    HEARTBEAT_RATE = 0.1
+    def __init__(self, name, group, port, loop=None):
+        self._loop = loop if loop else asyncio.get_event_loop()
 
-    def __init__(self, group, port):
-        self._caster = Multicaster(group, port)
-        self._listener = Listener('', 0)  # TODO: match IPv# of caster
+        self.name = name
+        self._peers = {}
+
+        self._caster = Multicaster(group, port, loop=loop)
+        self._listener = Listener('', 0, loop=loop)  # TODO: match IPv# of caster
+
+        self._caster.on_cast('heartbeat', self._heartbeat_callback)
 
     async def publish(self, topic, data):
         return await self._caster.cast('pubish', {
@@ -212,7 +217,7 @@ class Router:
             'data': data
         })
 
-    async def subscribe(self, topic, callback):
+    def subscribe(self, topic, callback):
         pass
 
     async def connect(self, route):
@@ -221,13 +226,51 @@ class Router:
     def on_connect(self, route, callback):
         pass
 
-    async def _task_heartbeat(self):
+    HEARTBEAT_RATE = 0.1
+    HEARTBEAT_EXPIRE = 1
+
+    async def _heartbeat_debug(self):
+        while True:
+            print(list(self._peers))
+            await asyncio.sleep(0.5, loop=self._loop)
+
+    async def _heartbeat_task(self):
         while True:
             await self._caster.cast('heartbeat', {
-                'source': None,
+                'source': self.name,
                 'listen': self._listener.address[1],
             })
             await asyncio.sleep(self.HEARTBEAT_RATE, loop=self._loop)
 
+    async def _heartbeat_callback(self, other, msg):
+        source = msg.data['source']
+        listen = msg.data['listen']
+        try:
+            peer = self._peers[source]
+            peer['expire'].cancel()
+        except KeyError:
+            self._peers[source] = peer = {}
+        peer['listen'] = other[0], listen
+        peer['time'] = self._loop.time()
+        peer['expire'] = self._loop.create_task(self._heartbeat_expire(source))
+
+    async def _heartbeat_expire(self, name):
+        await asyncio.sleep(self.HEARTBEAT_EXPIRE, loop=self._loop)
+        if name in self._peers:
+            del self._peers[name]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.stop()
+
     def start(self):
-        self._loop.create_task(self._task_heartbeat())
+        self._caster.start()
+        self._listener.start()
+        self._loop.create_task(self._heartbeat_task())
+
+    def stop(self):
+        self._caster.stop()
+        self._listener.stop()
+
