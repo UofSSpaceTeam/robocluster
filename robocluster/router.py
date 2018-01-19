@@ -2,6 +2,7 @@ import asyncio
 import socket
 import struct
 import json
+import ipaddress
 from uuid import uuid4
 
 from .loop import LoopedTask
@@ -10,6 +11,14 @@ from .util import as_coroutine
 
 
 BUFFER_SIZE = 1024
+
+
+def ip_info(addr):
+    addr = ipaddress.ip_address(addr)
+    if isinstance(addr, ipaddress.IPv6Address):
+        return socket.AF_INET6, addr
+    else:
+        return socket.AF_INET, addr
 
 
 class Message:
@@ -54,10 +63,11 @@ class Multicaster(LoopedTask):
         self._uuid = str(uuid4())
         self._callbacks = {}
 
-        info, *_ = socket.getaddrinfo(group, port)  # blocking call
+        family, addr = ip_info(group)
+        if not addr.is_multicast:
+            raise ValueError('group is not multicast')
 
-        self._group = info[4]
-        family = info[0]
+        self._group = str(addr), port
 
         sock = AsyncSocket(family, socket.SOCK_DGRAM, loop=loop)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -128,14 +138,11 @@ class Multicaster(LoopedTask):
 class Listener(LoopedTask):
     def __init__(self, host, port, loop=None):
         super().__init__(loop=loop)
-        self._uuid = str(uuid4())
         self._callbacks = {}
 
-        info, *_ = socket.getaddrinfo(host, port)  # blocking call
-        family = info[0]
-        address = info[4]
+        family, addr = ip_info(host)
         self._socket = AsyncSocket(family, socket.SOCK_STREAM)
-        self._socket.bind(address)
+        self._socket.bind((str(addr), port))
         self._socket.listen()
 
     @property
