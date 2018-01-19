@@ -40,7 +40,7 @@ def test_serial_read():
     TEST_DATA = {'test': 'value'}
 
     @device.on('test')
-    async def callback(event, data):
+    async def callback(event, data):  # pylint: disable=W0612
         assert(data == TEST_DATA)
         print("Got data {}".format(data))
         device.storage.msg_received = True

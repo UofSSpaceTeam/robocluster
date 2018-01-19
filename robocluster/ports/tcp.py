@@ -37,7 +37,7 @@ class IngressTcpPort(Port):
     async def __aexit__(self, exc_type, exc, tb):
         pass
 
-    async def _receive_task(self, reader, writer):
+    async def _receive_task(self, reader, writer):  # pylint: disable=W0221
         """Receive packets from the network and submit them to the device."""
         debug("TCP receive_task Running")
         while True:
@@ -129,7 +129,7 @@ class EgressTcpPort(Port):
             else:
                 raise RuntimeError('Packet format type not supported')
 
-    async def enable(self, host, port):
+    async def enable(self, host, port):  # pylint: disable=W0221
         """Enable the port and start the send_task."""
         self._host = host
         self._port = port
