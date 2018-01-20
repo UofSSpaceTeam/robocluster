@@ -224,12 +224,13 @@ class Router:
     async def _publish_callback(self, other, msg):
         topic = msg.data['topic']
         data = msg.data['data']
-        for key, callback in self._subscriptions:
+        for key, coro in self._subscriptions:
             if fnmatch(topic, key):
-                callback(topic, data)
+                self._loop.create_task(coro(topic, data))
 
     def subscribe(self, topic, callback):
-        self._subscriptions.append((topic, callback))
+        coro = as_coroutine(callback)
+        self._subscriptions.append((topic, coro))
 
     async def connect(self, route):
         pass
