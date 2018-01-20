@@ -68,14 +68,38 @@ class LoopThread(Thread):
         self.join()
 
 
-class LoopedTask(ABC):
+class Looper:
     def __init__(self, loop=None):
         self._loop = loop if loop else asyncio.get_event_loop()
-        self._task = None
+        self._coros = []
+        self._tasks = None
 
-    @abstractmethod
-    async def _looped_task(self):
-        pass
+    def create_task(self, coro):
+        return self._loop.create_task(coro)
+
+    def add_daemon_task(self, coro, *args, **kwargs):
+        self._coros.append((coro, args, kwargs))
+        if self._tasks is not None:
+            self.create_task(coro(*args, **kwargs))
+
+    def sleep(self, seconds):
+        return asyncio.sleep(seconds, loop=self._loop)
+
+    def start(self):
+        if self._tasks is not None:
+            raise RuntimeError('Already running')
+
+        self._tasks = []
+        for coro, args, kwargs in self._coros:
+            task = self._loop.create_task(coro(*args, **kwargs))
+            self._tasks.append(task)
+
+    def stop(self):
+        if self._tasks is None:
+            return
+        for task in self._tasks:
+            task.cancel()
+        self._tasks = None
 
     def __enter__(self):
         self.start()
@@ -83,16 +107,3 @@ class LoopedTask(ABC):
 
     def __exit__(self, *exc):
         self.stop()
-
-    def start(self):
-        if self._task is not None:
-            return False
-        self._task = self._loop.create_task(self._looped_task())
-        return True
-
-    def stop(self):
-        if self._task is None:
-            return False
-        self._task.cancel()
-        self._task = None
-        return True

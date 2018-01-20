@@ -5,7 +5,6 @@ from robocluster.router import Router
 
 async def amain(args):
     with Router(args.name, args.group, ip_family=args.ip) as r:
-        r.start()
         r.subscribe('*/hello', print)
         while True:
             await r.publish('hello', {'hello': 'world'})

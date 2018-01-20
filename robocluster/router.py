@@ -6,7 +6,7 @@ import ipaddress
 from fnmatch import fnmatch
 from uuid import uuid4
 
-from .loop import LoopedTask
+from .loop import Looper
 from .net import AsyncSocket, key_to_multicast
 from .util import as_coroutine
 
@@ -23,9 +23,9 @@ def ip_info(addr):
 
 
 class Message:
-    def __init__(self, source, kind, data):
+    def __init__(self, source, type, data):
         self.source = source
-        self.kind = kind
+        self.type = type
         self.data = data
 
     @classmethod
@@ -37,15 +37,15 @@ class Message:
         except json.JSONDecodeError:
             raise ValueError('Invalid JSON.')
 
-        if any(k not in packet for k in ('source', 'kind', 'data')):
+        if any(k not in packet for k in ('source', 'type', 'data')):
             raise ValueError('Improperly formatted message.')
 
-        return cls(packet['source'], packet['kind'], packet['data'])
+        return cls(packet['source'], packet['type'], packet['data'])
 
     def encode(self):
         return json.dumps({
             'source': self.source,
-            'kind': self.kind,
+            'type': self.type,
             'data': self.data,
         }).encode()
 
@@ -53,12 +53,12 @@ class Message:
         return '{}({!r}, {!r}, {!r})'.format(
             self.__class__.__name__,
             self.source,
-            self.kind,
+            self.type,
             self.data
         )
 
 
-class Multicaster(LoopedTask):
+class Multicaster(Looper):
     def __init__(self, group, port, loop=None):
         super().__init__(loop=loop)
         self._uuid = str(uuid4())
@@ -88,18 +88,9 @@ class Multicaster(LoopedTask):
             self._udp_send = AsyncSocket(family, socket.SOCK_DGRAM, loop=loop)
             self._udp_recv = sock
 
-    @property
-    def address(self):
-        return self._udp_recv.getsockname()
+        self.add_daemon_task(self._recv)
 
-    async def cast(self, kind, data):
-        msg = Message(self._uuid, kind, data)
-        return await self._udp_send.sendto(msg.encode(), self._group)
-
-    def on_cast(self, kind, callback):
-        self._callbacks[kind] = as_coroutine(callback)
-
-    async def _looped_task(self):
+    async def _recv(self):
         while True:
             msg, other = await self._udp_recv.recvfrom(BUFFER_SIZE)
             try:
@@ -111,14 +102,24 @@ class Multicaster(LoopedTask):
                 continue
 
             try:
-                callback = self._callbacks[msg.kind]
+                callback = self._callbacks[msg.type]
             except KeyError:
                 continue
-            self._loop.create_task(callback(other, msg))
+            self.create_task(callback(other, msg))
+
+    @property
+    def address(self):
+        return self._udp_recv.getsockname()
+
+    async def cast(self, type, data):
+        msg = Message(self._uuid, type, data)
+        return await self._udp_send.sendto(msg.encode(), self._group)
+
+    def on_cast(self, type, callback):
+        self._callbacks[type] = as_coroutine(callback)
 
     def stop(self):
-        if not super().stop():
-            return False
+        super().stop()
 
         family = self._udp_recv.family
         group_bin = socket.inet_pton(family, self._group[0])
@@ -133,10 +134,9 @@ class Multicaster(LoopedTask):
                 socket.IPPROTO_IP, socket.IP_DROP_MEMBERSHIP, mreq)
             self._udp_recv.close()
             self._udp_send.close()
-        return True
 
 
-class Listener(LoopedTask):
+class Listener(Looper):
     def __init__(self, host, port, loop=None):
         super().__init__(loop=loop)
         self._callbacks = {}
@@ -146,18 +146,13 @@ class Listener(LoopedTask):
         self._socket.bind((str(addr), port))
         self._socket.listen()
 
-    @property
-    def address(self):
-        return self._socket.getsockname()
+        self.add_daemon_task(self._listener)
 
-    def on_connect(self, kind, callback):
-        self._callbacks[kind] = as_coroutine(callback)
-
-    async def _looped_task(self):
+    async def _listener(self):
         while True:
             conn, _ = await self._socket.accept()
             conn = Connection(conn)
-            self._loop.create_task(self._handle_connection(conn))
+            self.create_task(self._handle_connection(conn))
 
     async def _handle_connection(self, conn):
         while True:
@@ -170,11 +165,16 @@ class Listener(LoopedTask):
                 break
         conn.close()
 
+    @property
+    def address(self):
+        return self._socket.getsockname()
+
+    def on_connect(self, type, callback):
+        self._callbacks[type] = as_coroutine(callback)
+
     def stop(self):
-        if not super().stop():
-            return False
+        super().stop()
         self._socket.close()
-        return True
 
 
 class Connection:
@@ -200,9 +200,9 @@ class Connection:
         self._socket.close()
 
 
-class Router:
+class Router(Looper):
     def __init__(self, name, group, ip_family='ipv6', loop=None):
-        self._loop = loop if loop else asyncio.get_event_loop()
+        super().__init__(loop=loop)
 
         self.name = name
         self.group = group
@@ -215,6 +215,8 @@ class Router:
         self._listener = Listener(listen, 0, loop=loop)
 
         self._caster.on_cast('heartbeat', self._heartbeat_callback)
+        self.add_daemon_task(self._heartbeat_daemon)
+        self.add_daemon_task(self._heartbeat_debug)
 
         self._subscriptions = []
         self._caster.on_cast('publish', self._publish_callback)
@@ -252,15 +254,15 @@ class Router:
                 for name, peer in self._peers.items()
             ]
             print(info)
-            await asyncio.sleep(0.5, loop=self._loop)
+            await self.sleep(0.5)
 
-    async def _heartbeat_task(self):
+    async def _heartbeat_daemon(self):
         while True:
             await self._caster.cast('heartbeat', {
                 'source': self.name,
                 'listen': self._listener.address[1],
             })
-            await asyncio.sleep(self.HEARTBEAT_RATE, loop=self._loop)
+            await self.sleep(self.HEARTBEAT_RATE)
 
     async def _heartbeat_callback(self, other, msg):
         source = msg.data['source']
@@ -271,25 +273,19 @@ class Router:
         except KeyError:
             self._peers[source] = peer = {}
         peer['listen'] = other[0], listen
-        peer['expire'] = self._loop.create_task(self._heartbeat_expire(source))
+        peer['expire'] = self.create_task(self._heartbeat_expire(source))
 
     async def _heartbeat_expire(self, name):
-        await asyncio.sleep(self.HEARTBEAT_EXPIRE, loop=self._loop)
+        await self.sleep(self.HEARTBEAT_EXPIRE)
         if name in self._peers:
             del self._peers[name]
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        self.stop()
-
     def start(self):
+        super().start()
         self._caster.start()
         self._listener.start()
-        self._loop.create_task(self._heartbeat_task())
-        self._loop.create_task(self._heartbeat_debug())
 
     def stop(self):
+        super().stop()
         self._caster.stop()
         self._listener.stop()
