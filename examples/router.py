@@ -4,7 +4,7 @@ from robocluster.loop import LoopThread
 from robocluster.router import Router
 
 async def amain(args):
-    with Router(args.name, args.group, args.port) as r:
+    with Router(args.name, args.group, ip_family=args.ip) as r:
         r.start()
         r.subscribe('*/hello', print)
         while True:
@@ -30,8 +30,8 @@ def parse_args(args):
     parser = ag.ArgumentParser()
 
     parser.add_argument('name')
-    parser.add_argument('--group', default='224.0.0.1')
-    parser.add_argument('--port', default=12345)
+    parser.add_argument('--group', default='router-example')
+    parser.add_argument('--ip', default='ipv6')
 
     return parser.parse_args()
 

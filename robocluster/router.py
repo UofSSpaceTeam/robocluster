@@ -7,7 +7,7 @@ from fnmatch import fnmatch
 from uuid import uuid4
 
 from .loop import LoopedTask
-from .net import AsyncSocket
+from .net import AsyncSocket, key_to_multicast
 from .util import as_coroutine
 
 
@@ -201,14 +201,18 @@ class Connection:
 
 
 class Router:
-    def __init__(self, name, group, port, loop=None):
+    def __init__(self, name, group, ip_family='ipv6', loop=None):
         self._loop = loop if loop else asyncio.get_event_loop()
 
         self.name = name
+        self.group = group
         self._peers = {}
 
+        group, port = key_to_multicast(group, family=ip_family)
         self._caster = Multicaster(group, port, loop=loop)
-        self._listener = Listener('0.0.0.0', 0, loop=loop)  # TODO: match IPv# of caster
+
+        listen = '::' if ip_family else '0.0.0.0'
+        self._listener = Listener(listen, 0, loop=loop)
 
         self._caster.on_cast('heartbeat', self._heartbeat_callback)
 
@@ -284,8 +288,8 @@ class Router:
         self._caster.start()
         self._listener.start()
         self._loop.create_task(self._heartbeat_task())
+        self._loop.create_task(self._heartbeat_debug())
 
     def stop(self):
         self._caster.stop()
         self._listener.stop()
-
