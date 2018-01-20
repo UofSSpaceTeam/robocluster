@@ -3,6 +3,7 @@ import socket
 import struct
 import json
 import ipaddress
+from fnmatch import fnmatch
 from uuid import uuid4
 
 from .loop import LoopedTask
@@ -207,18 +208,28 @@ class Router:
         self._peers = {}
 
         self._caster = Multicaster(group, port, loop=loop)
-        self._listener = Listener('', 0, loop=loop)  # TODO: match IPv# of caster
+        self._listener = Listener('0.0.0.0', 0, loop=loop)  # TODO: match IPv# of caster
 
         self._caster.on_cast('heartbeat', self._heartbeat_callback)
 
+        self._subscriptions = []
+        self._caster.on_cast('publish', self._publish_callback)
+
     async def publish(self, topic, data):
-        return await self._caster.cast('pubish', {
-            'topic': topic,
+        return await self._caster.cast('publish', {
+            'topic': '{}/{}'.format(self.name, topic),
             'data': data
         })
 
+    async def _publish_callback(self, other, msg):
+        topic = msg.data['topic']
+        data = msg.data['data']
+        for key, callback in self._subscriptions:
+            if fnmatch(topic, key):
+                callback(topic, data)
+
     def subscribe(self, topic, callback):
-        pass
+        self._subscriptions.append((topic, callback))
 
     async def connect(self, route):
         pass
@@ -231,7 +242,11 @@ class Router:
 
     async def _heartbeat_debug(self):
         while True:
-            print(list(self._peers))
+            info = [
+                (name, peer['listen'])
+                for name, peer in self._peers.items()
+            ]
+            print(info)
             await asyncio.sleep(0.5, loop=self._loop)
 
     async def _heartbeat_task(self):
@@ -251,7 +266,6 @@ class Router:
         except KeyError:
             self._peers[source] = peer = {}
         peer['listen'] = other[0], listen
-        peer['time'] = self._loop.time()
         peer['expire'] = self._loop.create_task(self._heartbeat_expire(source))
 
     async def _heartbeat_expire(self, name):

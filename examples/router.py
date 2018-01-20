@@ -1,17 +1,14 @@
 import asyncio
 
 from robocluster.loop import LoopThread
-from robocluster.router import Listener, Multicaster
+from robocluster.router import Router
 
 async def amain(args):
-    l = Listener('0.0.0.0', 0)
-    print(l.address)
-    l.start()
-
-    with Multicaster(args.group, args.port) as r:
-        r.on_cast('hello', print)
+    with Router(args.name, args.group, args.port) as r:
+        r.start()
+        r.subscribe('*/hello', print)
         while True:
-            await r.cast('hello', {'hello': 'world'})
+            await r.publish('hello', {'hello': 'world'})
             await asyncio.sleep(1)
 
 def main(args):
@@ -20,7 +17,6 @@ def main(args):
     thread = LoopThread()
     thread.start()
 
-    thread.create_task(amain(args))
     thread.create_task(amain(args))
 
     try:
@@ -33,6 +29,7 @@ def parse_args(args):
 
     parser = ag.ArgumentParser()
 
+    parser.add_argument('name')
     parser.add_argument('--group', default='224.0.0.1')
     parser.add_argument('--port', default=12345)
 
