@@ -95,7 +95,7 @@ class Multicaster(Looper):
 
         sock = AsyncSocket(family, socket.SOCK_DGRAM, loop=loop)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        # sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         sock.bind(('', port))
 
         group_bin = socket.inet_pton(family, self._group[0])
@@ -273,6 +273,7 @@ class Router(Looper):
 
         self._caster.on_cast('heartbeat', self._heartbeat_callback)
         self.add_daemon_task(self._heartbeat_daemon)
+        # TODO: add easier configuration for debug
         self.add_daemon_task(self._heartbeat_debug)
 
         self._subscriptions = []
