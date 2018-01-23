@@ -5,34 +5,23 @@ import pyvesc
 import serial
 import serial_asyncio
 
-from .base import Port
-from ..util import debug
+from .device import Device
+from .util import debug
 
 
-class SerialPort(Port):
-    """Wrapper for USB or USRT serial connections."""
 
-    def __init__(self, name, encoding, packet_queue, loop=None):
-        """
-        Initialize the serial port.
 
-        Args:
-            name (str): The name to identify the port by.
-            group (str): unused, please remove...
-            encoding (str): How to structure the data, json, vesc, etc.
-            packet_queue (asyncio.Queue): Queue to put incomming messages into.
-            loop (asyncio.AbstractEventLoop, optional):
-                The event loop to run on. Defaults to the current event loop.
-        """
-        self.name = name
-        self._loop = loop if loop else asyncio.get_event_loop()
-        self._packet_queue = packet_queue
+class SerialDevice(Device):
+
+    def __init__(self, name, group, encoding='json', baudrate=115200, loop=None):
+        super().__init__(name, group, loop=loop)
+        self._usb_path = name
+        self._baudrate = baudrate
         self._reader = None  # once initialized, an asyncio.StreamReader
         self._writer = None  # once initialized, an asyncio.StreamWriter
         self.encoding = encoding
-        self._usb_path = name
-        self._baudrate = 115200
         self._send_queue = asyncio.Queue(loop=self._loop)
+        self._loop.create_task(self._init_serial())
 
     async def _init_serial(self):
         """Initialize the StreamReader and StreamWriter."""
@@ -44,6 +33,8 @@ class SerialPort(Port):
             )
             self._reader, self._writer = r, w
             debug("Serial reader and writer initialized")
+            self._loop.create_task(self._receive_task())
+            self._loop.create_task(self._send_task())
         except serial.serialutil.SerialException:
             print('USB path not found')
             await asyncio.sleep(0.2)
@@ -130,17 +121,11 @@ class SerialPort(Port):
                     raise RuntimeError('Encoding is not supported')
                 _packet['port'] = self.name
                 debug("Got packet {}".format(_packet))
-                await self._packet_queue.put(_packet)
+                if 'event' in _packet: #TODO temporary hack.
+                    await self._packet_queue.put(_packet)
             except serial.serialutil.SerialException:
                 print('serial disconnect')
                 self._reader = None
                 while self._reader == None:
                     await self._init_serial()
 
-    async def enable(self):
-        """
-        Starts the receive_task and send_task
-        and initializes reader and writer
-        """
-        await self._init_serial()
-        await super().enable()
