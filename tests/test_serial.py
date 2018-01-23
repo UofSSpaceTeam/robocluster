@@ -48,6 +48,7 @@ def test_serial_read():
     device.start()
     time.sleep(0.1)
     packet = {
+        'type': 'send',
         'event': 'test',
         'data': TEST_DATA
     }
