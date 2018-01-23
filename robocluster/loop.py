@@ -69,32 +69,58 @@ class LoopThread(Thread):
 
 
 class Looper:
+    """
+    A wrapper for an event loop that allows for a group of daemon tasks.
+
+    The daemon tasks can all be started and stopped.
+    """
+
     def __init__(self, loop=None):
+        """
+        Initialize the looper.
+
+        When loop is omitted, the current event loop is used.
+        """
         self._loop = loop if loop else asyncio.get_event_loop()
         self._coros = []
         self._tasks = None
 
     def create_task(self, coro):
+        """Create a task in the event loop."""
         return self._loop.create_task(coro)
 
     def add_daemon_task(self, coro, *args, **kwargs):
+        """
+        Add a daemon task and starts it if the looper is started.
+
+        Arguments and keyword arguments past coro are passed down to coro when
+        it is started.
+        """
         self._coros.append((coro, args, kwargs))
         if self._tasks is not None:
-            self.create_task(coro(*args, **kwargs))
+            task = self.create_task(coro(*args, **kwargs))
+            self._tasks.append(task)
 
     def sleep(self, seconds):
+        """
+        Suspend execution for seconds.
+
+        This method is a coroutine.
+        """
         return asyncio.sleep(seconds, loop=self._loop)
 
     def start(self):
+        """Start daemon tasks."""
         if self._tasks is not None:
             raise RuntimeError('Already running')
 
         self._tasks = []
         for coro, args, kwargs in self._coros:
-            task = self._loop.create_task(coro(*args, **kwargs))
+            task = self.create_task(coro(*args, **kwargs))
             self._tasks.append(task)
 
     def stop(self):
+        """Stop daemon tasks."""
         if self._tasks is None:
             return
         for task in self._tasks:
@@ -102,8 +128,10 @@ class Looper:
         self._tasks = None
 
     def __enter__(self):
+        """Enter context manager, equivalent to calling start()."""
         self.start()
         return self
 
     def __exit__(self, *exc):
+        """Exit context manager, equivalent to calling stop()."""
         self.stop()

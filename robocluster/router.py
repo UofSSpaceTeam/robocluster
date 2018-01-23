@@ -15,6 +15,7 @@ BUFFER_SIZE = 1024
 
 
 def ip_info(addr):
+    """Verify and detecet ip address family."""
     addr = ipaddress.ip_address(addr)
     if isinstance(addr, ipaddress.IPv6Address):
         return socket.AF_INET6, addr
@@ -23,13 +24,24 @@ def ip_info(addr):
 
 
 class Message:
+    """Base message type for network."""
+
     def __init__(self, source, type, data):
+        """
+        Initialize a message.
+
+        Arguments:
+            source: source of message (str)
+            type: message type (str)
+            data: JSON encodable data.
+        """
         self.source = source
         self.type = type
         self.data = data
 
     @classmethod
     def from_bytes(cls, msg):
+        """Create a Message from bytes."""
         try:
             packet = json.loads(msg.decode())
         except UnicodeDecodeError:
@@ -43,6 +55,7 @@ class Message:
         return cls(packet['source'], packet['type'], packet['data'])
 
     def encode(self):
+        """Encode the message to bytes."""
         return json.dumps({
             'source': self.source,
             'type': self.type,
@@ -60,6 +73,16 @@ class Message:
 
 class Multicaster(Looper):
     def __init__(self, group, port, loop=None):
+        """
+        Initialize the multicaster.
+
+        Arguments:
+            group: multicast group to send and receive from.
+            port: port to bind to.
+
+        Optional Arguments:
+            loop: event loop to use.
+        """
         super().__init__(loop=loop)
         self._uuid = str(uuid4())
         self._callbacks = {}
@@ -91,6 +114,7 @@ class Multicaster(Looper):
         self.add_daemon_task(self._recv)
 
     async def _recv(self):
+        """Receive daemon task."""
         while True:
             msg, other = await self._udp_recv.recvfrom(BUFFER_SIZE)
             try:
@@ -109,16 +133,20 @@ class Multicaster(Looper):
 
     @property
     def address(self):
+        """Address of the receiving socket."""
         return self._udp_recv.getsockname()
 
     async def cast(self, type, data):
+        """Send a message on the multicast network."""
         msg = Message(self._uuid, type, data)
         return await self._udp_send.sendto(msg.encode(), self._group)
 
     def on_cast(self, type, callback):
+        """Add a callback to a message type."""
         self._callbacks[type] = as_coroutine(callback)
 
     def stop(self):
+        """Stops multicaster."""
         super().stop()
 
         family = self._udp_recv.family
@@ -137,7 +165,19 @@ class Multicaster(Looper):
 
 
 class Listener(Looper):
+    """Listens for new connections."""
+
     def __init__(self, host, port, loop=None):
+        """
+        Initialize the listener.
+
+        Arguments:
+            host: host ip to bind to
+            port: port number to bind to
+
+        Optional Arguments:
+            loop: event loop to use.
+        """
         super().__init__(loop=loop)
         self._callbacks = {}
 
@@ -178,30 +218,47 @@ class Listener(Looper):
 
 
 class Connection:
+    """Connection wrapper for bare AsyncSocket."""
+
     def __init__(self, sock):
+        """Initialize the connection from a bare socket."""
         self._socket = sock
 
     @classmethod
     async def from_addr(cls, host, port):
-        """We want to be able to create a connection from the client side."""
-        info, *_ = socket.getaddrinfo(group, port)  # blocking call
-        sock = AsyncSocket(info[0], socket.SOCK_STREAM)
-        await sock.connect(info[4])
+        """Connect to a listening server by host and port."""
+        family, host = ip_info(host)
+        print(host)
+        sock = AsyncSocket(family, socket.SOCK_STREAM)
+        await sock.connect((str(host), port))
         return cls(sock)
 
-    async def write(self, data):
-        msg = Message('source', 'type', data).encode()
-        return await self._socket.send(msg)
+    async def write(self, msg):
+        """Write a message to the connection."""
+        return await self._socket.send(msg.encode())
 
     async def read(self):
+        """Read a message from the connection."""
         return Message.from_bytes(await self._socket.recv(BUFFER_SIZE))
 
     def close(self):
+        """Close the connection."""
         self._socket.close()
 
 
 class Router(Looper):
     def __init__(self, name, group, ip_family='ipv6', loop=None):
+        """
+        Initialize the router.
+
+        Arguments:
+            name: name of the router, will be sent to peers (str)
+            group: name of multicast group for peers (str)
+
+        Optional Arguments:
+            ip_family: either ipv4 or ipv6
+            loop: event loop that the router runs on.
+        """
         super().__init__(loop=loop)
 
         self.name = name
@@ -222,12 +279,14 @@ class Router(Looper):
         self._caster.on_cast('publish', self._publish_callback)
 
     async def publish(self, topic, data):
+        """Publish a message to a topic."""
         return await self._caster.cast('publish', {
             'topic': '{}/{}'.format(self.name, topic),
             'data': data
         })
 
     async def _publish_callback(self, other, msg):
+        """Handle published messages and start tasks for each callback."""
         topic = msg.data['topic']
         data = msg.data['data']
         for key, coro in self._subscriptions:
@@ -235,19 +294,34 @@ class Router(Looper):
                 self._loop.create_task(coro(topic, data))
 
     def subscribe(self, topic, callback):
+        """Subscribe to a topic."""
         coro = as_coroutine(callback)
         self._subscriptions.append((topic, coro))
 
-    async def connect(self, route):
-        pass
+    async def connect(self, name, route):
+        """Connect to a peer by name with specific route."""
+        # TODO: do we wait until the peer is connected?
+        if name not in self._peers:
+            raise RuntimeError('peer not available')
+        conn = await Connection.from_addr(*self._peers[name]['listen'])
+        await conn.write(Message(self.name, 'connect', {'route': route}))
+        return conn
 
     def on_connect(self, route, callback):
-        pass
+        """Register a callback for a route."""
+        coro = as_coroutine(callback)
+        self._routes.append((route, coro))
+
+    async def _connect_callback(self, conn, route):
+        """Handle new connection."""
+        print(conn, route)
+        conn.close()
 
     HEARTBEAT_RATE = 0.1
     HEARTBEAT_EXPIRE = 1
 
     async def _heartbeat_debug(self):
+        """Debug task for heartbeats."""
         while True:
             info = [
                 (name, peer['listen'])
@@ -257,6 +331,7 @@ class Router(Looper):
             await self.sleep(0.5)
 
     async def _heartbeat_daemon(self):
+        """Daemon task for heartbeat sending."""
         while True:
             await self._caster.cast('heartbeat', {
                 'source': self.name,
@@ -265,6 +340,7 @@ class Router(Looper):
             await self.sleep(self.HEARTBEAT_RATE)
 
     async def _heartbeat_callback(self, other, msg):
+        """Handle heartbeat when received."""
         source = msg.data['source']
         listen = msg.data['listen']
         try:
@@ -276,16 +352,19 @@ class Router(Looper):
         peer['expire'] = self.create_task(self._heartbeat_expire(source))
 
     async def _heartbeat_expire(self, name):
+        """Expire the peer in a bit."""
         await self.sleep(self.HEARTBEAT_EXPIRE)
         if name in self._peers:
             del self._peers[name]
 
     def start(self):
+        """Start the router."""
         super().start()
         self._caster.start()
         self._listener.start()
 
     def stop(self):
+        """Stop the router."""
         super().stop()
         self._caster.stop()
         self._listener.stop()
