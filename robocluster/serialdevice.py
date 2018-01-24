@@ -8,20 +8,18 @@ import serial_asyncio
 from .device import Device
 from .util import debug
 
-
-
-
-class SerialDevice(Device):
-
-    def __init__(self, name, group, encoding='json', baudrate=115200, loop=None):
-        super().__init__(name, group, loop=loop)
+class SerialConnection():
+    def __init__(self, name, encoding='json', baudrate=115200, loop=None):
+        self._loop = loop if loop else asyncio.get_event_loop()
         self._usb_path = name
+        self.name = name
         self._baudrate = baudrate
         self._reader = None  # once initialized, an asyncio.StreamReader
         self._writer = None  # once initialized, an asyncio.StreamWriter
         self.encoding = encoding
         self._send_queue = asyncio.Queue(loop=self._loop)
         self._loop.create_task(self._init_serial())
+        self.packet_callback = None
 
     async def _init_serial(self):
         """Initialize the StreamReader and StreamWriter."""
@@ -121,11 +119,27 @@ class SerialDevice(Device):
                     raise RuntimeError('Encoding is not supported')
                 _packet['port'] = self.name
                 debug("Got packet {}".format(_packet))
-                if 'event' in _packet: #TODO temporary hack.
-                    await self._packet_queue.put(_packet)
+                if self.packet_callback is not None:
+                    await self.packet_callback(_packet)
             except serial.serialutil.SerialException:
                 print('serial disconnect')
                 self._reader = None
                 while self._reader == None:
                     await self._init_serial()
 
+
+class SerialDevice(Device):
+
+    def __init__(self, name, group, loop=None):
+        super().__init__(name, group, loop=loop)
+        self.serial_connection = SerialConnection(name, encoding='json', loop=self._loop)
+        self.serial_connection.packet_callback = self.handle_packet
+
+    async def handle_packet(self, packet):
+        print(packet)
+        if packet['type'] == 'heartbeat':
+            self.name = packet['source']
+            self._router.name = self.name
+        elif packet['type'] == 'publish':
+            #TODO can we pass messages straight through?
+            await self.publish(packet['data']['topic'], packet['data']['data'])
