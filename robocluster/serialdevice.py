@@ -58,14 +58,12 @@ class SerialConnection():
             packet = await self._send_queue.get()
             debug("Sending packet {}".format(packet))
             if self.encoding == 'raw':
-                await self._writer.write(packet)
+                self._writer.write(packet)
             elif self.encoding == 'utf8':
-                await self._writer.write(packet.encode())
+                self._writer.write(packet.encode())
             elif self.encoding == 'json':
-                await self._writer.write(json.dumps(packet).encode())
+                self._writer.write(json.dumps(packet).encode())
             elif self.encoding == 'vesc':
-                # I don't know why I can't await the _writer in
-                # this context, but can in others...
                 self._writer.write(pyvesc.encode(packet))
             else:
                 raise RuntimeError('Packet format type not supported')
@@ -134,6 +132,7 @@ class SerialDevice(Device):
         super().__init__(name, group, loop=loop)
         self.serial_connection = SerialConnection(name, encoding='json', loop=self._loop)
         self.serial_connection.packet_callback = self.handle_packet
+        self._router.on_message(self.forward_packet)
 
     async def handle_packet(self, packet):
         print(packet)
@@ -143,3 +142,6 @@ class SerialDevice(Device):
         elif packet['type'] == 'publish':
             #TODO can we pass messages straight through?
             await self.publish(packet['data']['topic'], packet['data']['data'])
+
+    async def forward_packet(self, packet):
+        await self.serial_connection.write(packet.to_json())

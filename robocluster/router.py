@@ -56,11 +56,14 @@ class Message:
 
     def encode(self):
         """Encode the message to bytes."""
+        return self.to_json().encode()
+
+    def to_json(self):
         return json.dumps({
             'source': self.source,
             'type': self.type,
             'data': self.data,
-        }).encode()
+        })
 
     def __repr__(self):
         return '{}({!r}, {!r}, {!r})'.format(
@@ -278,6 +281,7 @@ class Router(Looper):
 
         self._subscriptions = []
         self._caster.on_cast('publish', self._publish_callback)
+        self.message_callback = None
 
     async def publish(self, topic, data):
         """Publish a message to a topic."""
@@ -293,6 +297,11 @@ class Router(Looper):
         for key, coro in self._subscriptions:
             if fnmatch(topic, key):
                 self._loop.create_task(coro(topic, data))
+        if self.message_callback:
+            await self.message_callback(msg)
+
+    def on_message(self, callback):
+        self.message_callback = as_coroutine(callback)
 
     def subscribe(self, topic, callback):
         """Subscribe to a topic."""

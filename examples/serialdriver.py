@@ -14,6 +14,10 @@ tester = Device('tester', 'rover')
 async def blarg():
     await tester.publish('blarg', 27)
 
+@tester.on('*/sensor1')
+def print_sensor(event, data):
+    print('Sensor 1 data: {}'.format(data))
+
 
 try:
     driver.start()
