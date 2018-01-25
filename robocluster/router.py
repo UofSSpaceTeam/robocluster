@@ -12,6 +12,7 @@ from .util import as_coroutine
 
 
 BUFFER_SIZE = 1024
+HEARTBEAT_DEBUG = False
 
 
 def ip_info(addr):
@@ -43,9 +44,15 @@ class Message:
     def from_bytes(cls, msg):
         """Create a Message from bytes."""
         try:
-            packet = json.loads(msg.decode())
+            return cls.from_string(msg.decode())
         except UnicodeDecodeError:
             raise ValueError('Invalid utf-8.')
+
+    @classmethod
+    def from_string(cls, msg):
+        """Create a Message from a utf-8 string."""
+        try:
+            packet = json.loads(msg)
         except json.JSONDecodeError:
             raise ValueError('Invalid JSON.')
 
@@ -56,11 +63,14 @@ class Message:
 
     def encode(self):
         """Encode the message to bytes."""
+        return self.to_json().encode()
+
+    def to_json(self):
         return json.dumps({
             'source': self.source,
             'type': self.type,
             'data': self.data,
-        }).encode()
+        })
 
     def __repr__(self):
         return '{}({!r}, {!r}, {!r})'.format(
@@ -273,11 +283,12 @@ class Router(Looper):
 
         self._caster.on_cast('heartbeat', self._heartbeat_callback)
         self.add_daemon_task(self._heartbeat_daemon)
-        # TODO: add easier configuration for debug
-        self.add_daemon_task(self._heartbeat_debug)
+        if HEARTBEAT_DEBUG:
+            self.add_daemon_task(self._heartbeat_debug)
 
         self._subscriptions = []
         self._caster.on_cast('publish', self._publish_callback)
+        self.message_callbacks = []
 
     async def publish(self, topic, data):
         """Publish a message to a topic."""
@@ -293,6 +304,23 @@ class Router(Looper):
         for key, coro in self._subscriptions:
             if fnmatch(topic, key):
                 self._loop.create_task(coro(topic, data))
+        for callback in self.message_callbacks:
+            await callback(msg)
+
+    def on_message(self, callback):
+        """Add a handler to be called when the router receives a message."""
+        self.message_callbacks.append(as_coroutine(callback))
+
+    async def route_message(self, msg):
+        """Figure out what to do with an arbitrary message."""
+        if msg.type == 'publish':
+            await self.publish(msg.data['topic'], msg.data['data'])
+        elif msg.type == 'send':
+            pass
+        elif msg.type == 'request':
+            pass
+        elif msg.type == 'heartbeat':
+            pass
 
     def subscribe(self, topic, callback):
         """Subscribe to a topic."""

@@ -8,7 +8,6 @@ from functools import wraps
 from threading import Thread
 
 from .util import duration_to_seconds, as_coroutine
-from .ports import MulticastPort, SerialPort, EgressTcpPort, IngressTcpPort
 from .router import Router
 
 class AttributeDict(dict):
@@ -229,45 +228,6 @@ class Device:
         """
         seconds = duration_to_seconds(duration)
         return asyncio.sleep(seconds, loop=self._loop)
-
-    def create_serial(self, usb_path, encoding=transport):
-        """Create a new SerialDevice."""
-        self.ports[usb_path] = SerialPort(
-            name=usb_path,
-            encoding=encoding,
-            packet_queue=self._packet_queue,
-            loop=self._loop
-        )
-        self._loop.create_task(self.ports[usb_path].enable())
-
-    def create_ingress_tcp(self, device_name, encoding=transport):
-        """Create a new incomming tcp port."""
-        self.ports[device_name] = IngressTcpPort(
-            name=device_name,
-            encoding=encoding,
-            packet_queue=self._packet_queue,
-            loop=self._loop
-        )
-        self._loop.create_task(self.ports[device_name].enable())
-
-    def create_egress_tcp(self, device_name, encoding=transport):
-        """Create a new tcp for outgoing data."""
-        self.ports[device_name] = EgressTcpPort(
-            name=device_name,
-            encoding=encoding,
-            loop=self._loop
-        )
-        async def send_request():
-            async with self.ports['tcp'] as ingress:
-                sockname = ingress.getsockname()
-                await self.publish('SEND_REQUEST', {
-                    'requested-device': device_name,
-                    'sender-address': sockname[0],
-                    'sender-port': sockname[1],
-                    'sender-name': self.name,
-                    'encoding': encoding
-                })
-        self._loop.create_task(send_request())
 
     def start(self):
         """Start device."""
