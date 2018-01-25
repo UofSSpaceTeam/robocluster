@@ -1,6 +1,6 @@
 
 from robocluster import SerialDevice, Device
-import robocluster.util; robocluster.util.DEBUG = True
+# import robocluster.util; robocluster.util.DEBUG = True
 
 driver = SerialDevice('/dev/ttyACM0', 'rover')
 

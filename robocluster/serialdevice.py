@@ -129,18 +129,22 @@ class SerialConnection():
 
 class SerialDevice(Device):
 
-    def __init__(self, name, group, loop=None):
+    def __init__(self, name, group, loop=None, encoding='json'):
         super().__init__(name, group, loop=loop)
-        self.serial_connection = SerialConnection(name, encoding='json', loop=self._loop)
+        self.serial_connection = SerialConnection(name, encoding=encoding, loop=self._loop)
         self.serial_connection.packet_callback = self.handle_packet
         self._router.on_message(self.forward_packet)
 
     async def handle_packet(self, packet):
+        print(packet)
         if packet['type'] == 'heartbeat':
             self.name = packet['source']
             self._router.name = self.name
         msg = Message(packet['source'], packet['type'], packet['data'])
-        self._router.route_message(msg)
+        await self._router.route_message(msg)
 
     async def forward_packet(self, packet):
         await self.serial_connection.write(packet.to_json())
+
+    async def write(self, data):
+        await self.serial_connection.write(data)

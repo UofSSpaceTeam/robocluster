@@ -277,7 +277,7 @@ class Router(Looper):
         self._caster.on_cast('heartbeat', self._heartbeat_callback)
         self.add_daemon_task(self._heartbeat_daemon)
         # TODO: add easier configuration for debug
-        self.add_daemon_task(self._heartbeat_debug)
+        #self.add_daemon_task(self._heartbeat_debug)
 
         self._subscriptions = []
         self._caster.on_cast('publish', self._publish_callback)
@@ -303,10 +303,9 @@ class Router(Looper):
     def on_message(self, callback):
         self.message_callbacks.append(as_coroutine(callback))
 
-    def route_message(self, msg):
-        print(msg)
+    async def route_message(self, msg):
         if msg.type == 'publish':
-            self.publish(msg.data['topic'], msg.data['data'])
+            await self.publish(msg.data['topic'], msg.data['data'])
         elif msg.type == 'send':
             pass
         elif msg.type == 'request':
