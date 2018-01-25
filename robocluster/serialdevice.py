@@ -7,6 +7,7 @@ import serial_asyncio
 
 from .device import Device
 from .util import debug
+from .router import Message
 
 class SerialConnection():
     def __init__(self, name, encoding='json', baudrate=115200, loop=None):
@@ -135,13 +136,11 @@ class SerialDevice(Device):
         self._router.on_message(self.forward_packet)
 
     async def handle_packet(self, packet):
-        print(packet)
         if packet['type'] == 'heartbeat':
             self.name = packet['source']
             self._router.name = self.name
-        elif packet['type'] == 'publish':
-            #TODO can we pass messages straight through?
-            await self.publish(packet['data']['topic'], packet['data']['data'])
+        msg = Message(packet['source'], packet['type'], packet['data'])
+        self._router.route_message(msg)
 
     async def forward_packet(self, packet):
         await self.serial_connection.write(packet.to_json())

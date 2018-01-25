@@ -281,7 +281,7 @@ class Router(Looper):
 
         self._subscriptions = []
         self._caster.on_cast('publish', self._publish_callback)
-        self.message_callback = None
+        self.message_callbacks = []
 
     async def publish(self, topic, data):
         """Publish a message to a topic."""
@@ -297,11 +297,22 @@ class Router(Looper):
         for key, coro in self._subscriptions:
             if fnmatch(topic, key):
                 self._loop.create_task(coro(topic, data))
-        if self.message_callback:
-            await self.message_callback(msg)
+        for callback in self.message_callbacks:
+            await callback(msg)
 
     def on_message(self, callback):
-        self.message_callback = as_coroutine(callback)
+        self.message_callbacks.append(as_coroutine(callback))
+
+    def route_message(self, msg):
+        print(msg)
+        if msg.type == 'publish':
+            self.publish(msg.data['topic'], msg.data['data'])
+        elif msg.type == 'send':
+            pass
+        elif msg.type == 'request':
+            pass
+        elif msg.type == 'heartbeat':
+            pass
 
     def subscribe(self, topic, callback):
         """Subscribe to a topic."""
