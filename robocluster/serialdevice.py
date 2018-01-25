@@ -10,6 +10,7 @@ from .util import debug
 from .router import Message
 
 class SerialConnection():
+    """Handles reading and writing to a serial device"""
     def __init__(self, name, encoding='json', baudrate=115200, loop=None, disable_receive_loop=False):
         self._loop = loop if loop else asyncio.get_event_loop()
         self._usb_path = name
@@ -39,11 +40,11 @@ class SerialConnection():
             print('USB path not found')
             await asyncio.sleep(0.2)
 
-    async def read(self):
+    async def read(self, num_bytes=1):
         """Read a single byte from the serial device."""
         if not self._reader:
             raise RuntimeError("Serial reader not initialized yet")
-        return self._reader.read(1)
+        return self._reader.read(num_bytes)
 
 
     def write(self, packet):
@@ -130,6 +131,7 @@ class SerialConnection():
 
 
 class SerialDevice(Device):
+    """Device that exposes a serial device to the robocluster network."""
 
     def __init__(self, name, group, loop=None, encoding='json', disable_receive_loop=False):
         super().__init__(name, group, loop=loop)
@@ -140,6 +142,7 @@ class SerialDevice(Device):
         self._router.on_message(self.forward_packet)
 
     async def handle_packet(self, message):
+        """Forward messages from serial to robocluster network."""
         print(message)
         if message.type == 'heartbeat':
             self.name = message.source
@@ -147,10 +150,13 @@ class SerialDevice(Device):
         await self._router.route_message(message)
 
     async def forward_packet(self, packet):
+        """Forwards messages from robocluster network to serial device."""
         await self.serial_connection.write(packet.to_json())
 
     async def write(self, data):
+        """Write to the serial device."""
         await self.serial_connection.write(data)
 
-    async def read(self):
-        return self.serial_connection.read()
+    async def read(self, num_bytes=1):
+        """Read a byte from the serial device"""
+        return self.serial_connection.read(num_bytes)
