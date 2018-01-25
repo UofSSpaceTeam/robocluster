@@ -76,7 +76,7 @@ class SerialConnection():
         debug("Serial Receive task running")
         while True:
             try:
-                _packet = {}
+                _message = None
                 if self.encoding == 'json':
                     pkt = ''
                     curleystack = 0
@@ -96,9 +96,9 @@ class SerialConnection():
                         pkt += b
                         if curleystack == 0 and squarestack == 0:
                             done_reading = True
-                    _packet = json.loads(pkt)
-                    if _packet['type'] == 'heartbeat':
-                        self.name = _packet['source']
+                    _message = Message.from_string(pkt)
+                    if _message.type == 'heartbeat':
+                        self.name = _message.source
                 elif self.encoding == 'vesc':
                     # Taken from Roveberrypy
                     def to_int(b):
@@ -110,16 +110,17 @@ class SerialConnection():
                     length = await self._reader.read(to_int(header) - 1)
                     packet = await self._reader.read(to_int(length) + 4)
                     msg, _ = pyvesc.decode(header + length + packet)
-                    _packet = {
-                        'event': msg.__class__.__name__,
-                        'data': msg
-                    }
+                    _message = Message( #TODO: How should message type be determined?
+                        self.name,
+                        'publish',
+                        {'topic':msg.__class__.__name__,
+                         'data': msg}
+                    )
                 else:
                     raise RuntimeError('Encoding is not supported')
-                _packet['port'] = self.name
-                debug("Got packet {}".format(_packet))
+                debug("Got packet {}".format(_message))
                 if self.packet_callback is not None:
-                    await self.packet_callback(_packet)
+                    await self.packet_callback(_message)
             except serial.serialutil.SerialException:
                 print('serial disconnect')
                 self._reader = None
@@ -135,13 +136,12 @@ class SerialDevice(Device):
         self.serial_connection.packet_callback = self.handle_packet
         self._router.on_message(self.forward_packet)
 
-    async def handle_packet(self, packet):
-        print(packet)
-        if packet['type'] == 'heartbeat':
-            self.name = packet['source']
+    async def handle_packet(self, message):
+        print(message)
+        if message.type == 'heartbeat':
+            self.name = message.source
             self._router.name = self.name
-        msg = Message(packet['source'], packet['type'], packet['data'])
-        await self._router.route_message(msg)
+        await self._router.route_message(message)
 
     async def forward_packet(self, packet):
         await self.serial_connection.write(packet.to_json())

@@ -43,9 +43,15 @@ class Message:
     def from_bytes(cls, msg):
         """Create a Message from bytes."""
         try:
-            packet = json.loads(msg.decode())
+            return cls.from_string(msg.decode())
         except UnicodeDecodeError:
             raise ValueError('Invalid utf-8.')
+
+    @classmethod
+    def from_string(cls, msg):
+        """Create a Message from a utf-8 string."""
+        try:
+            packet = json.loads(msg)
         except json.JSONDecodeError:
             raise ValueError('Invalid JSON.')
 
