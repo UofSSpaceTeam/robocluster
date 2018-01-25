@@ -10,7 +10,7 @@ from .util import debug
 from .router import Message
 
 class SerialConnection():
-    def __init__(self, name, encoding='json', baudrate=115200, loop=None):
+    def __init__(self, name, encoding='json', baudrate=115200, loop=None, disable_receive_loop=False):
         self._loop = loop if loop else asyncio.get_event_loop()
         self._usb_path = name
         self.name = name
@@ -19,10 +19,10 @@ class SerialConnection():
         self._writer = None  # once initialized, an asyncio.StreamWriter
         self.encoding = encoding
         self._send_queue = asyncio.Queue(loop=self._loop)
-        self._loop.create_task(self._init_serial())
+        self._loop.create_task(self._init_serial(disable_receive_loop))
         self.packet_callback = None
 
-    async def _init_serial(self):
+    async def _init_serial(self, disable_receive_loop):
         """Initialize the StreamReader and StreamWriter."""
         try:
             r, w = await serial_asyncio.open_serial_connection(
@@ -32,7 +32,8 @@ class SerialConnection():
             )
             self._reader, self._writer = r, w
             debug("Serial reader and writer initialized")
-            self._loop.create_task(self._receive_task())
+            if not disable_receive_loop:
+                self._loop.create_task(self._receive_task())
             self._loop.create_task(self._send_task())
         except serial.serialutil.SerialException:
             print('USB path not found')
@@ -130,9 +131,11 @@ class SerialConnection():
 
 class SerialDevice(Device):
 
-    def __init__(self, name, group, loop=None, encoding='json'):
+    def __init__(self, name, group, loop=None, encoding='json', disable_receive_loop=False):
         super().__init__(name, group, loop=loop)
-        self.serial_connection = SerialConnection(name, encoding=encoding, loop=self._loop)
+        self.serial_connection = SerialConnection(name,
+                encoding=encoding, loop=self._loop,
+                disable_receive_loop=disable_receive_loop)
         self.serial_connection.packet_callback = self.handle_packet
         self._router.on_message(self.forward_packet)
 
@@ -148,3 +151,6 @@ class SerialDevice(Device):
 
     async def write(self, data):
         await self.serial_connection.write(data)
+
+    async def read(self):
+        return self.serial_connection.read()

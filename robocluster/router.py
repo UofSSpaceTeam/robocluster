@@ -12,6 +12,7 @@ from .util import as_coroutine
 
 
 BUFFER_SIZE = 1024
+HEARTBEAT_DEBUG = False
 
 
 def ip_info(addr):
@@ -282,8 +283,8 @@ class Router(Looper):
 
         self._caster.on_cast('heartbeat', self._heartbeat_callback)
         self.add_daemon_task(self._heartbeat_daemon)
-        # TODO: add easier configuration for debug
-        #self.add_daemon_task(self._heartbeat_debug)
+        if HEARTBEAT_DEBUG:
+            self.add_daemon_task(self._heartbeat_debug)
 
         self._subscriptions = []
         self._caster.on_cast('publish', self._publish_callback)
@@ -307,9 +308,11 @@ class Router(Looper):
             await callback(msg)
 
     def on_message(self, callback):
+        """Add a handler to be called when the router receives a message."""
         self.message_callbacks.append(as_coroutine(callback))
 
     async def route_message(self, msg):
+        """Figure out what to do with an arbitrary message."""
         if msg.type == 'publish':
             await self.publish(msg.data['topic'], msg.data['data'])
         elif msg.type == 'send':
