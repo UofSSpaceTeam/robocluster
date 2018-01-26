@@ -31,6 +31,11 @@ is just a wrapper for conventional socket programming. When we refer to the
 "Robocluster network", it is just refers to any virtual devices using the Robocluster library
 to talk over the local area network.
 
+.. figure:: _static/robocluster_network.png
+    :align: center
+
+    A simplification of the roboluster network.
+
 
 What can Robocluster do?
 ------------------------
