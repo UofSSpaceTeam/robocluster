@@ -8,9 +8,10 @@ Robolcuster is a framework for creating software for
 robotics in which modules can be distributed across multiple
 devices. The goal is to make it as easy as possible for processes
 to talk to each other, allowing for highly modular software for robotics.
-Robocluster library implementations are primarily communications libraries,
-but also provide some simple task management features, such as calling functions
-at regular intervals.
+This documentation focuses on the Python implementation of Robocluster,
+though implementations in other languages are certainly possible.
+Robocluster is primarily a communication library, but also provides some simple
+task management features, such as calling functions at regular intervals.
 
 .. note::
 
@@ -18,6 +19,17 @@ at regular intervals.
     most of the functionality and wire protocols backwards compatible, the internals
     of the Python implementation and features of Robocluster may change significantly
     over the next months.
+
+Robocluster centers around the concept of virtual devices, which are just things
+that perform tasks and interact with other virtual devices on the robocluster network.
+Throughout this documentation, you may also see the term "driver" which refers to the same
+thing as a virtual device, but usually is dedicated to translating between the robocluster
+network and another medium such as USB serial, or a particular device such as a GPS unit.
+
+Robocluster's primary mechanism for communication is UDP/IP and the bulk of the library
+is just a wrapper for conventional socket programming. When we refer to the
+"Robocluster network", it is just refers to any virtual devices using the Robocluster library
+to talk over the local area network.
 
 
 What can Robocluster do?
@@ -27,8 +39,8 @@ Here is a list of some of the things you can do with Robocluster:
 - Run a task at regular intervals (every second, 100ms, 2 minutes, etc).
 - Broadcast or publish messages to the network.
 - Subscribe to a broadcasted message and call a function when that message is published.
-- Send data directly to another process on the network.
-- Request data from another process on the network.
+- Send data directly to another virtual device on the network.
+- Request data from another virtual device on the network.
 - Serial USB devices can participate in the network.
 
 In robotics software, you frequently need some task to be ran periodically,
