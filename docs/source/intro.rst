@@ -52,7 +52,8 @@ In robotics software, you frequently need some task to be ran periodically,
 so Robocluster provides a method to schedule tasks at regular intervals.
 Inside these tasks, you can do what ever, talk to other devices on the network,
 perform calculations, etc.
-TODO: what happens if the task takes longer to run that the interval?
+
+.. note:: TODO: what happens if the task takes longer to run that the interval?
 
 Many services you write will provide data or events for any other components to use.
 The publish method broadcasts data over the network to no-one in particular.
