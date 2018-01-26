@@ -6,21 +6,20 @@ import json
 import pyvesc
 from pyvesc import ExampleSendMessage
 
-from robocluster import Device
+from robocluster import SerialDevice, Device
 
 def test_serial_write():
     # Create pseuto-terminals
     # Only works on Unix systems...
     master, slave = pty.openpty()
 
-    device = Device('test', 'tester')
-    device.create_serial(os.ttyname(slave))
+    device = SerialDevice(os.ttyname(slave), 'tester')
 
     TEST_DATA = {'test': 'value'}
 
     @device.task
     async def write_ser():
-        await device.ports[os.ttyname(slave)].write(TEST_DATA)
+        await device.write(TEST_DATA)
         print("done write")
 
     device.start()
@@ -33,42 +32,47 @@ def test_serial_write():
 def test_serial_read():
     master, slave = pty.openpty()
 
+    serial = SerialDevice(os.ttyname(slave), 'tester')
     device = Device('test', 'tester')
-    device.create_serial(os.ttyname(slave))
     device.storage.msg_received = False
 
     TEST_DATA = {'test': 'value'}
 
-    @device.on('test')
+    @device.on('*/test')
     async def callback(event, data):  # pylint: disable=W0612
         assert(data == TEST_DATA)
         print("Got data {}".format(data))
         device.storage.msg_received = True
 
+    serial.start()
     device.start()
     time.sleep(0.1)
     packet = {
-        'event': 'test',
-        'data': TEST_DATA
+        'source': 'tester',
+        'type': 'publish',
+        'data': {
+            'topic': 'test',
+            'data': TEST_DATA
+        }
     }
     os.write(master, json.dumps(packet).encode('utf8'))
     time.sleep(0.1)
     device.stop()
+    serial.stop()
     assert(device.storage.msg_received)
 
 def test_vesc_write():
     # Same as test_serial_write but with vesc data
     master, slave = pty.openpty()
 
-    device = Device('test', 'tester')
-    device.create_serial(os.ttyname(slave), encoding='vesc')
+    device = SerialDevice(os.ttyname(slave), 'tester', encoding='vesc')
 
     TEST_MSG = 'Hello world'
     TEST_DATA = ExampleSendMessage(TEST_MSG)
 
     @device.task
     async def write_ser():
-        await device.ports[os.ttyname(slave)].write(TEST_DATA)
+        await device.write(TEST_DATA)
         print("done write")
 
     device.start()
