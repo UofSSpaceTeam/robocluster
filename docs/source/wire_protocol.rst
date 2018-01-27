@@ -17,7 +17,8 @@ Messages have the following structure in JSON::
         'data': <nested_JSON_object>
     }
 
-The 'source' field marks where the message came from. TODO...
+The 'source' field marks where the message came from. It is a unique identifier
+for the socket that sent it, and is not very useful to humans.
 
 The 'data' field varies depending on the message type, and simple contains
 the data that the virtual device is sending.
@@ -54,7 +55,7 @@ about how to connect to each other. The JSON structure of a heartbeat message is
 The listen field tells other vitual devices which port number to connect to in
 order to ``send`` or ``request`` with that virtual device.
 
-.. note:: TODO: how is data.source different from msg.source?
+The 'source' field within the 'data' field contains the name of the device.
 
 publish
 -------
