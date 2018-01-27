@@ -1,8 +1,8 @@
 
-from robocluster import SerialDevice, Device
+from robocluster import SerialDriver, Device
 # import robocluster.util; robocluster.util.DEBUG = True
 
-driver = SerialDevice('/dev/ttyACM0', 'rover')
+driver = SerialDriver('/dev/ttyACM0', 'rover')
 tester = Device('tester', 'rover')
 
 @tester.every('1s')
