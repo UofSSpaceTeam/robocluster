@@ -105,7 +105,12 @@ class Multicaster(Looper):
 
         sock = AsyncSocket(family, socket.SOCK_DGRAM, loop=loop)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        # sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        try:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        except:
+            # TODO: what kind of exception does this throw on Linux
+            pass
+
         sock.bind(('', port))
 
         group_bin = socket.inet_pton(family, self._group[0])
