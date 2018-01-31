@@ -12,7 +12,7 @@ from .util import as_coroutine
 
 
 BUFFER_SIZE = 1024
-HEARTBEAT_DEBUG = False
+HEARTBEAT_DEBUG = True
 
 
 def ip_info(addr):
@@ -200,7 +200,9 @@ class Listener(Looper):
 
     async def _listener(self):
         while True:
+            print('listen {}'.format(self.address))
             conn, _ = await self._socket.accept()
+            print(conn)
             conn = Connection(conn)
             self.create_task(self._handle_connection(conn))
 
@@ -210,10 +212,18 @@ class Listener(Looper):
                 msg = await conn.read()
                 # TODO: figure out which callback is needed
                 print(msg)
+                if msg.type == 'send':
+                    topic = msg.data['topic']
+                    data = msg.data['data']
+                    if topic in self._callbacks:
+                        await self._callbacks[topic](topic, data)
             except Exception as e:
                 print(e)
                 break
         conn.close()
+
+    def add_callback(self, topic, callback):
+        self._callbacks[topic] = callback
 
     @property
     def address(self):
@@ -238,13 +248,13 @@ class Connection:
     async def from_addr(cls, host, port):
         """Connect to a listening server by host and port."""
         family, host = ip_info(host)
-        print(host)
         sock = AsyncSocket(family, socket.SOCK_STREAM)
         await sock.connect((str(host), port))
         return cls(sock)
 
     async def write(self, msg):
         """Write a message to the connection."""
+        print('Sending: {}'.format(msg))
         return await self._socket.send(msg.encode())
 
     async def read(self):
@@ -278,7 +288,7 @@ class Router(Looper):
         group, port = key_to_multicast(group, family=ip_family)
         self._caster = Multicaster(group, port, loop=loop)
 
-        listen = '::' if ip_family else '0.0.0.0'
+        listen = '::' if ip_family == 'ipv6' else '0.0.0.0'
         self._listener = Listener(listen, 0, loop=loop)
 
         self._caster.on_cast('heartbeat', self._heartbeat_callback)
@@ -289,6 +299,8 @@ class Router(Looper):
         self._subscriptions = []
         self._caster.on_cast('publish', self._publish_callback)
         self.message_callbacks = []
+        self._connections = {}
+        self._pending_connections = {}
 
     async def publish(self, topic, data):
         """Publish a message to a topic."""
@@ -296,6 +308,17 @@ class Router(Looper):
             'topic': '{}/{}'.format(self.name, topic),
             'data': data
         })
+
+    async def send(self, dest, topic, data):
+        """Send a message directly to a device"""
+        if dest not in self._connections:
+            await self.connect(dest)
+        _data = {
+            'topic': topic,
+            'data': data
+        }
+        msg = Message(self.name, 'send', _data)
+        await self._connections[dest].write(msg)
 
     async def _publish_callback(self, other, msg):
         """Handle published messages and start tasks for each callback."""
@@ -326,25 +349,17 @@ class Router(Looper):
         """Subscribe to a topic."""
         coro = as_coroutine(callback)
         self._subscriptions.append((topic, coro))
+        self._listener.add_callback(topic, callback)
 
-    async def connect(self, name, route):
-        """Connect to a peer by name with specific route."""
-        # TODO: do we wait until the peer is connected?
+    async def connect(self, name):
+        """Connect to a peer by name."""
         if name not in self._peers:
-            raise RuntimeError('peer not available')
-        conn = await Connection.from_addr(*self._peers[name]['listen'])
-        await conn.write(Message(self.name, 'connect', {'route': route}))
-        return conn
-
-    def on_connect(self, route, callback):
-        """Register a callback for a route."""
-        coro = as_coroutine(callback)
-        self._routes.append((route, coro))
-
-    async def _connect_callback(self, conn, route):
-        """Handle new connection."""
-        print(conn, route)
-        conn.close()
+            self._pending_connections[name] = asyncio.Future()
+            print(await self._pending_connections[name])
+            del self._pending_connections[name]
+            # raise RuntimeError('peer not available')
+        self._connections[name] = await Connection.from_addr(*self._peers[name]['listen'])
+        print('Connected to {}'.format(self._peers[name]['listen']))
 
     HEARTBEAT_RATE = 0.1
     HEARTBEAT_EXPIRE = 1
@@ -377,6 +392,9 @@ class Router(Looper):
             peer['expire'].cancel()
         except KeyError:
             self._peers[source] = peer = {}
+        if source in self._pending_connections:
+            if not self._pending_connections[source].done():
+                self._pending_connections[source].set_result(peer)
         peer['listen'] = other[0], listen
         peer['expire'] = self.create_task(self._heartbeat_expire(source))
 

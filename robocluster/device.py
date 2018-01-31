@@ -94,17 +94,7 @@ class Device:
                 over the network. For the default json encoding,
                 dictionaries are a good way to package data.
         """
-        if dest not in self.ports:
-            self.create_egress_tcp(dest)
-        if self.ports[dest].encoding == 'json':
-            packet = {
-                'event': '{}/{}'.format(self.name, topic),
-                'data': data
-            }
-            await self.ports[dest].write(packet)
-        else:
-            # encodings like vesc or raw shouldn't be put in a dictionary.
-            await self.ports[dest].write(data)
+        await self._router.send(dest, topic, data)
 
     async def request(self, dest, topic):
         """
