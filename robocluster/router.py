@@ -192,7 +192,7 @@ class Listener(Looper):
         self._callbacks = {}
 
         family, addr = ip_info(host)
-        self._socket = AsyncSocket(family, socket.SOCK_STREAM)
+        self._socket = AsyncSocket(family, socket.SOCK_STREAM, loop=loop)
         self._socket.bind((str(addr), port))
         self._socket.listen()
 
@@ -202,7 +202,6 @@ class Listener(Looper):
         while True:
             print('listen {}'.format(self.address))
             conn, _ = await self._socket.accept()
-            print(conn)
             conn = Connection(conn)
             self.create_task(self._handle_connection(conn))
 
@@ -245,10 +244,10 @@ class Connection:
         self._socket = sock
 
     @classmethod
-    async def from_addr(cls, host, port):
+    async def from_addr(cls, host, port, loop=None):
         """Connect to a listening server by host and port."""
         family, host = ip_info(host)
-        sock = AsyncSocket(family, socket.SOCK_STREAM)
+        sock = AsyncSocket(family, socket.SOCK_STREAM, loop=loop)
         await sock.connect((str(host), port))
         return cls(sock)
 
@@ -267,7 +266,7 @@ class Connection:
 
 
 class Router(Looper):
-    def __init__(self, name, group, ip_family='ipv6', loop=None):
+    def __init__(self, name, group, ip_family='ipv4', loop=None):
         """
         Initialize the router.
 
@@ -355,7 +354,7 @@ class Router(Looper):
         """Connect to a peer by name."""
         if name not in self._peers:
             self._pending_connections[name] = asyncio.Future()
-            print(await self._pending_connections[name])
+            await self._pending_connections[name]
             del self._pending_connections[name]
             # raise RuntimeError('peer not available')
         self._connections[name] = await Connection.from_addr(*self._peers[name]['listen'])
