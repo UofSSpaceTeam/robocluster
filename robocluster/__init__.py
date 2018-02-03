@@ -1,2 +1,2 @@
 from .device import Device
-from .serialdevice import SerialDevice
+from .serialdriver import SerialDriver

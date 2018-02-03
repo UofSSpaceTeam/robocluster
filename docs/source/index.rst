@@ -10,7 +10,9 @@ Welcome to robocluster's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   intro
    tutorial
+   wire_protocol
    robocluster
 
 

@@ -130,7 +130,7 @@ class SerialConnection():
                     await self._init_serial()
 
 
-class SerialDevice(Device):
+class SerialDriver(Device):
     """Device that exposes a serial device to the robocluster network."""
 
     def __init__(self, name, group, loop=None, encoding='json', disable_receive_loop=False):
