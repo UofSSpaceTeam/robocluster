@@ -6,14 +6,14 @@ import json
 import pyvesc
 from pyvesc import ExampleSendMessage
 
-from robocluster import SerialDevice, Device
+from robocluster import SerialDriver, Device
 
 def test_serial_write():
     # Create pseuto-terminals
     # Only works on Unix systems...
     master, slave = pty.openpty()
 
-    device = SerialDevice(os.ttyname(slave), 'tester')
+    device = SerialDriver(os.ttyname(slave), 'tester')
 
     TEST_DATA = {'test': 'value'}
 
@@ -32,7 +32,7 @@ def test_serial_write():
 def test_serial_read():
     master, slave = pty.openpty()
 
-    serial = SerialDevice(os.ttyname(slave), 'tester')
+    serial = SerialDriver(os.ttyname(slave), 'tester')
     device = Device('test', 'tester')
     device.storage.msg_received = False
 
@@ -65,7 +65,7 @@ def test_vesc_write():
     # Same as test_serial_write but with vesc data
     master, slave = pty.openpty()
 
-    device = SerialDevice(os.ttyname(slave), 'tester', encoding='vesc')
+    device = SerialDriver(os.ttyname(slave), 'tester', encoding='vesc')
 
     TEST_MSG = 'Hello world'
     TEST_DATA = ExampleSendMessage(TEST_MSG)
