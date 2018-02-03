@@ -214,27 +214,20 @@ class Listener(Looper):
         while True:
             try:
                 msg = await conn.read()
-                # TODO: figure out which callback is needed
                 print(msg)
-                if msg.type == 'send':
-                    topic = msg.data['topic']
-                    data = msg.data['data']
-                    if topic in self._callbacks:
-                        await self._callbacks[topic](topic, data)
+                if msg.type in self._callbacks:
+                    self.create_task(self._callbacks[msg.type](msg.source, msg))
             except Exception as e:
                 print(e)
                 break
         conn.close()
 
-    def add_callback(self, topic, callback):
-        self._callbacks[topic] = callback
+    def on_message(self, type, callback):
+        self._callbacks[type] = as_coroutine(callback)
 
     @property
     def address(self):
         return self._socket.getsockname()
-
-    def on_connect(self, type, callback):
-        self._callbacks[type] = as_coroutine(callback)
 
     def stop(self):
         super().stop()
@@ -294,6 +287,7 @@ class Router(Looper):
 
         listen = '::' if ip_family == 'ipv6' else '0.0.0.0'
         self._listener = Listener(listen, 0, loop=loop)
+        self._listener.on_message('send', self._send_callback)
 
         self._caster.on_cast('heartbeat', self._heartbeat_callback)
         self.add_daemon_task(self._heartbeat_daemon)
@@ -318,7 +312,7 @@ class Router(Looper):
         if dest not in self._connections:
             await self.connect(dest)
         _data = {
-            'topic': topic,
+            'topic': '{}/{}'.format(self.name, topic),
             'data': data
         }
         msg = Message(self.name, 'send', _data)
@@ -326,6 +320,17 @@ class Router(Looper):
 
     async def _publish_callback(self, other, msg):
         """Handle published messages and start tasks for each callback."""
+        topic = msg.data['topic']
+        data = msg.data['data']
+        for key, coro in self._subscriptions:
+            if fnmatch(topic, key):
+                self._loop.create_task(coro(topic, data))
+        for callback in self.message_callbacks:
+            await callback(msg)
+
+    async def _send_callback(self, other, msg):
+        """Handle direct messages and start tasks for each callback."""
+        #TODO This is just a copy of _publish_callback
         topic = msg.data['topic']
         data = msg.data['data']
         for key, coro in self._subscriptions:
@@ -353,7 +358,6 @@ class Router(Looper):
         """Subscribe to a topic."""
         coro = as_coroutine(callback)
         self._subscriptions.append((topic, coro))
-        self._listener.add_callback(topic, callback)
 
     async def connect(self, name):
         """Connect to a peer by name."""

@@ -8,7 +8,7 @@ getter = Device('getter', 'rover')
 async def send():
     await sender.send('getter', 'test', 1234)
 
-@getter.on('test')
+@getter.on('*test')
 async def callback(event, data):
     print("event {}, data {}".format(event, data))
 
