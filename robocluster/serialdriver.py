@@ -112,12 +112,21 @@ class SerialConnection():
                     length = await self._reader.read(to_int(header) - 1)
                     packet = await self._reader.read(to_int(length) + 4)
                     msg, _ = pyvesc.decode(header + length + packet)
-                    _message = Message( #TODO: How should message type be determined?
-                        self.name,
-                        'publish',
-                        {'topic':msg.__class__.__name__,
-                         'data': msg}
-                    )
+                    if msg.__class__.__name__ == 'ReqSubscription':
+                        self.name = msg.subscription
+                        _message = Message( #TODO: How should message type be determined?
+                            self.name,
+                            'heartbeat',
+                            {'source': self.name,
+                             'listen': 'none'}
+                        )
+                    else:
+                        _message = Message( #TODO: How should message type be determined?
+                            self.name,
+                            'publish',
+                            {'topic':msg.__class__.__name__,
+                             'data': msg}
+                        )
                 else:
                     raise RuntimeError('Encoding is not supported')
                 debug("Got packet {}".format(_message))
@@ -139,6 +148,7 @@ class SerialDriver(Device):
                 encoding=encoding, loop=self._loop,
                 disable_receive_loop=disable_receive_loop)
         self.serial_connection.packet_callback = self.handle_packet
+        self.encoding = encoding
         self._router.on_message(self.forward_packet)
 
     async def handle_packet(self, message):
@@ -147,7 +157,8 @@ class SerialDriver(Device):
         if message.type == 'heartbeat':
             self.name = message.source
             self._router.name = self.name
-        await self._router.route_message(message)
+        if self.encoding == 'json': #TODO: support VESC/binary?
+            await self._router.route_message(message)
 
     async def forward_packet(self, packet):
         """Forwards messages from robocluster network to serial device."""
