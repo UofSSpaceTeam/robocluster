@@ -3,6 +3,8 @@ import socket
 import struct
 import json
 import ipaddress
+import traceback
+from abc import ABC, abstractmethod
 from fnmatch import fnmatch
 from uuid import uuid4
 
@@ -80,8 +82,44 @@ class Message:
             self.data
         )
 
+class Caster(ABC, Looper):
+    """Caster for handling broadcast like communication."""
 
-class Multicaster(Looper):
+    def __init__(self, loop=None):
+        super().__init__(loop=loop)
+        self._uuid = str(uuid4())
+        self._callbacks = {}
+
+        self.add_daemon_task(self._recv_daemon)
+
+    async def _recv_daemon(self):
+        while True:
+            try:
+                msg, other = await self._recv()
+                if msg.type not in self._callbacks:
+                    continue
+                if msg.source == self._uuid:
+                    continue
+                self.create_task(self._callbacks[msg.type](other, msg))
+            except:
+                traceback.print_exc()
+
+    @abstractmethod
+    async def _recv(self):
+        """Receive a message. Returns message and source."""
+        pass
+
+    @abstractmethod
+    async def cast(self, data):
+        """Send a message."""
+        pass
+
+    def on_cast(self, type, callback):
+        """Add a callback to a message type."""
+        self._callbacks[type] = as_coroutine(callback)
+
+
+class Multicaster(Caster):
     def __init__(self, group, port, loop=None):
         """
         Initialize the multicaster.
@@ -93,10 +131,6 @@ class Multicaster(Looper):
         Optional Arguments:
             loop: event loop to use.
         """
-        super().__init__(loop=loop)
-        self._uuid = str(uuid4())
-        self._callbacks = {}
-
         family, addr = ip_info(group)
         if not addr.is_multicast:
             raise ValueError('group is not multicast')
@@ -126,39 +160,24 @@ class Multicaster(Looper):
             self._udp_send = AsyncSocket(family, socket.SOCK_DGRAM, loop=loop)
             self._udp_recv = sock
 
-        self.add_daemon_task(self._recv)
-
-    async def _recv(self):
-        """Receive daemon task."""
-        while True:
-            msg, other = await self._udp_recv.recvfrom(BUFFER_SIZE)
-            try:
-                msg = Message.from_bytes(msg)
-            except ValueError:
-                continue
-
-            if msg.source == self._uuid:
-                continue
-
-            try:
-                callback = self._callbacks[msg.type]
-            except KeyError:
-                continue
-            self.create_task(callback(other, msg))
+        # We call this at the end so that the socket can be created before
+        # the recv_daemon starts
+        super().__init__(loop=loop)
 
     @property
     def address(self):
         """Address of the receiving socket."""
         return self._udp_recv.getsockname()
 
+    async def _recv(self):
+        msg, other = await self._udp_recv.recvfrom(BUFFER_SIZE)
+        msg = Message.from_bytes(msg)
+        return msg, other
+
     async def cast(self, type, data):
         """Send a message on the multicast network."""
         msg = Message(self._uuid, type, data)
         return await self._udp_send.sendto(msg.encode(), self._group)
-
-    def on_cast(self, type, callback):
-        """Add a callback to a message type."""
-        self._callbacks[type] = as_coroutine(callback)
 
     def stop(self):
         """Stops multicaster."""
