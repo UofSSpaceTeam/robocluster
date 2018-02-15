@@ -198,6 +198,63 @@ class Multicaster(Caster):
             self._udp_send.close()
 
 
+class Broadcaster(Caster):
+    """Caster on IPv4 broadcast."""
+
+    MAGIC = b'\x46\xb4\x9a\x0d'  # used to make sure we parse our packets
+
+    def __init__(self, port, loop=None):
+        """
+        Initialize the broadcaster.
+
+        Arguments:
+            port: port to bind to.
+
+        Optional Arguments:
+            loop: event loop to use.
+        """
+        self._address = '255.255.255.255', port
+
+        sock = AsyncSocket(socket.AF_INET, socket.SOCK_DGRAM, loop=loop)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        except:
+            # TODO: what kind of exception does this throw on Linux
+            pass
+
+        sock.bind(('', port))
+        self._udp = sock
+
+        # We call this at the end so that the socket can be created before
+        # the recv_daemon starts
+        super().__init__(loop=loop)
+
+    @property
+    def address(self):
+        """Address of the receiving socket."""
+        return self._udp_recv.getsockname()
+
+    async def _recv(self):
+        msg, other = await self._udp.recvfrom(BUFFER_SIZE)
+        if msg[:4] != Broadcaster.MAGIC:
+            raise ValueError('Invalid broadcast magic.')
+        msg = Message.from_bytes(msg[4:])
+        return msg, other
+
+    async def cast(self, type, data):
+        """Send a message on the multicast network."""
+        msg = Message(self._uuid, type, data)
+        msg = Broadcaster.MAGIC + msg.encode()
+        return await self._udp.sendto(msg, self._address)
+
+    def stop(self):
+        """Stops multicaster."""
+        super().stop()
+        sefl._udp.close()
+
+
 class Listener(Looper):
     """Listens for new connections."""
 
