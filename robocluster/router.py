@@ -4,6 +4,7 @@ import struct
 import json
 import ipaddress
 import traceback
+from contextlib import suppress
 from abc import ABC, abstractmethod
 from fnmatch import fnmatch
 from uuid import uuid4
@@ -141,8 +142,8 @@ class Multicaster(Caster):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-        except:
-            # TODO: what kind of exception does this throw on Linux
+        except AttributeError:
+            # This is being throw on Linux
             pass
 
         sock.bind(('', port))
@@ -218,11 +219,9 @@ class Broadcaster(Caster):
         sock = AsyncSocket(socket.AF_INET, socket.SOCK_DGRAM, loop=loop)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        try:
+        with suppress(AttributeError):
+            # This is thrown on Linux
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-        except:
-            # TODO: what kind of exception does this throw on Linux
-            pass
 
         sock.bind(('', port))
         self._udp = sock
