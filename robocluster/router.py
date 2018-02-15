@@ -140,11 +140,9 @@ class Multicaster(Caster):
 
         sock = AsyncSocket(family, socket.SOCK_DGRAM, loop=loop)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        try:
+        with suppress(AttributeError):
+            # This is thrown on Linux
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-        except AttributeError:
-            # This is being throw on Linux
-            pass
 
         sock.bind(('', port))
 
@@ -233,7 +231,7 @@ class Broadcaster(Caster):
     @property
     def address(self):
         """Address of the receiving socket."""
-        return self._udp_recv.getsockname()
+        return self._udp.getsockname()
 
     async def _recv(self):
         msg, other = await self._udp.recvfrom(BUFFER_SIZE)
@@ -358,7 +356,8 @@ class Router(Looper):
         self._peers = {}
 
         group, port = key_to_multicast(group, family=ip_family)
-        self._caster = Multicaster(group, port, loop=loop)
+        #self._caster = Multicaster(group, port, loop=loop)
+        self._caster = Broadcaster(port, loop=loop)
 
         listen = '::' if ip_family == 'ipv6' else '0.0.0.0'
         self._listener = Listener(listen, 0, loop=loop)
