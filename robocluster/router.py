@@ -102,8 +102,11 @@ class Caster(ABC, Looper):
                 if msg.source == self._uuid:
                     continue
                 self.create_task(self._callbacks[msg.type](other, msg))
-            except:
-                traceback.print_exc()
+            except BlockingIOError:
+                break
+            except RuntimeError:
+                break
+                # traceback.print_exc()
 
     @abstractmethod
     async def _recv(self):
@@ -249,7 +252,7 @@ class Broadcaster(Caster):
     def stop(self):
         """Stops multicaster."""
         super().stop()
-        sefl._udp.close()
+        self._udp.close()
 
 
 class Listener(Looper):
