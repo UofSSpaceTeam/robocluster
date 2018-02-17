@@ -104,9 +104,6 @@ class Caster(ABC, Looper):
                 self.create_task(self._callbacks[msg.type](other, msg))
             except BlockingIOError:
                 break
-            except RuntimeError:
-                break
-                # traceback.print_exc()
 
     @abstractmethod
     async def _recv(self):
