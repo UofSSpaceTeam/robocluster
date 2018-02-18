@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from uuid import uuid4
 
-from .loop import Looper
-from .message import Message
+from ..loop import Looper
+from ..message import Message
 
 class Port(ABC, Looper):
     """
@@ -22,11 +23,13 @@ class Port(ABC, Looper):
         while True:
             try:
                 msg = await self._recv()
+                print("recieved ", msg)
                 if msg.type not in self._callbacks:
                     continue
                 if msg.source == self._uuid:
                     continue
-                self.create_task(self._callbacks[msg.type](msg))
+                for cb in self._callbacks[msg.type]:
+                    self.create_task(cb(msg.source, msg))
             except BlockingIOError:
                 break
 
@@ -36,7 +39,7 @@ class Port(ABC, Looper):
         pass
 
     @abstractmethod
-    async def send(self, data):
+    async def send(self, type, data):
         """Send a message."""
         pass
 

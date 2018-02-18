@@ -1,8 +1,6 @@
 import asyncio
 import socket
-import struct
 import json
-import ipaddress
 import traceback
 from contextlib import suppress
 from abc import ABC, abstractmethod
@@ -11,77 +9,14 @@ from uuid import uuid4
 
 from .loop import Looper
 from .net import AsyncSocket, key_to_multicast
-from .util import as_coroutine
+from .util import as_coroutine, ip_info
+from .message import Message
+from .ports.caster import Multicaster, Broadcaster
 
 
 BUFFER_SIZE = 1024
 HEARTBEAT_DEBUG = True
 
-
-def ip_info(addr):
-    """Verify and detecet ip address family."""
-    addr = ipaddress.ip_address(addr)
-    if isinstance(addr, ipaddress.IPv6Address):
-        return socket.AF_INET6, addr
-    else:
-        return socket.AF_INET, addr
-
-
-class Message:
-    """Base message type for network."""
-
-    def __init__(self, source, type, data):
-        """
-        Initialize a message.
-
-        Arguments:
-            source: source of message (str)
-            type: message type (str)
-            data: JSON encodable data.
-        """
-        self.source = source
-        self.type = type
-        self.data = data
-
-    @classmethod
-    def from_bytes(cls, msg):
-        """Create a Message from bytes."""
-        try:
-            return cls.from_string(msg.decode())
-        except UnicodeDecodeError:
-            raise ValueError('Invalid utf-8.')
-
-    @classmethod
-    def from_string(cls, msg):
-        """Create a Message from a utf-8 string."""
-        try:
-            packet = json.loads(msg)
-        except json.JSONDecodeError:
-            raise ValueError('Invalid JSON.')
-
-        if any(k not in packet for k in ('source', 'type', 'data')):
-            raise ValueError('Improperly formatted message.')
-
-        return cls(packet['source'], packet['type'], packet['data'])
-
-    def encode(self):
-        """Encode the message to bytes."""
-        return self.to_json().encode()
-
-    def to_json(self):
-        return json.dumps({
-            'source': self.source,
-            'type': self.type,
-            'data': self.data,
-        })
-
-    def __repr__(self):
-        return '{}({!r}, {!r}, {!r})'.format(
-            self.__class__.__name__,
-            self.source,
-            self.type,
-            self.data
-        )
 
 class Caster(ABC, Looper):
     """Caster for handling broadcast like communication."""
@@ -118,138 +53,6 @@ class Caster(ABC, Looper):
     def on_cast(self, type, callback):
         """Add a callback to a message type."""
         self._callbacks[type] = as_coroutine(callback)
-
-
-class Multicaster(Caster):
-    def __init__(self, group, port, loop=None):
-        """
-        Initialize the multicaster.
-
-        Arguments:
-            group: multicast group to send and receive from.
-            port: port to bind to.
-
-        Optional Arguments:
-            loop: event loop to use.
-        """
-        family, addr = ip_info(group)
-        if not addr.is_multicast:
-            raise ValueError('group is not multicast')
-
-        self._group = str(addr), port
-
-        sock = AsyncSocket(family, socket.SOCK_DGRAM, loop=loop)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        with suppress(AttributeError):
-            # This is thrown on Linux
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-
-        sock.bind(('', port))
-
-        group_bin = socket.inet_pton(family, self._group[0])
-        if family == socket.AF_INET6:
-            mreq = group_bin + struct.pack('@I', socket.INADDR_ANY)
-            sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
-            self._udp_send = sock
-            self._udp_recv = sock
-        elif family == socket.AF_INET:
-            mreq = group_bin + struct.pack('=I', socket.INADDR_ANY)
-            sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-            # IPv4 does not allow sending from multicast bound socket
-            self._udp_send = AsyncSocket(family, socket.SOCK_DGRAM, loop=loop)
-            self._udp_recv = sock
-
-        # We call this at the end so that the socket can be created before
-        # the recv_daemon starts
-        super().__init__(loop=loop)
-
-    @property
-    def address(self):
-        """Address of the receiving socket."""
-        return self._udp_recv.getsockname()
-
-    async def _recv(self):
-        msg, other = await self._udp_recv.recvfrom(BUFFER_SIZE)
-        msg = Message.from_bytes(msg)
-        return msg, other
-
-    async def cast(self, type, data):
-        """Send a message on the multicast network."""
-        msg = Message(self._uuid, type, data)
-        return await self._udp_send.sendto(msg.encode(), self._group)
-
-    def stop(self):
-        """Stops multicaster."""
-        super().stop()
-
-        family = self._udp_recv.family
-        group_bin = socket.inet_pton(family, self._group[0])
-        if family == socket.AF_INET6:
-            mreq = group_bin + struct.pack('@I', socket.INADDR_ANY)
-            self._udp_recv.setsockopt(
-                socket.IPPROTO_IPV6, socket.IPV6_LEAVE_GROUP, mreq)
-            self._udp_recv.close()
-        elif family == socket.AF_INET:
-            mreq = group_bin + struct.pack('=I', socket.INADDR_ANY)
-            self._udp_recv.setsockopt(
-                socket.IPPROTO_IP, socket.IP_DROP_MEMBERSHIP, mreq)
-            self._udp_recv.close()
-            self._udp_send.close()
-
-
-class Broadcaster(Caster):
-    """Caster on IPv4 broadcast."""
-
-    MAGIC = b'\x46\xb4\x9a\x0d'  # used to make sure we parse our packets
-
-    def __init__(self, port, loop=None):
-        """
-        Initialize the broadcaster.
-
-        Arguments:
-            port: port to bind to.
-
-        Optional Arguments:
-            loop: event loop to use.
-        """
-        self._address = '255.255.255.255', port
-
-        sock = AsyncSocket(socket.AF_INET, socket.SOCK_DGRAM, loop=loop)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        with suppress(AttributeError):
-            # This is thrown on Linux
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-
-        sock.bind(('', port))
-        self._udp = sock
-
-        # We call this at the end so that the socket can be created before
-        # the recv_daemon starts
-        super().__init__(loop=loop)
-
-    @property
-    def address(self):
-        """Address of the receiving socket."""
-        return self._udp.getsockname()
-
-    async def _recv(self):
-        msg, other = await self._udp.recvfrom(BUFFER_SIZE)
-        if msg[:4] != Broadcaster.MAGIC:
-            raise ValueError('Invalid broadcast magic.')
-        msg = Message.from_bytes(msg[4:])
-        return msg, other
-
-    async def cast(self, type, data):
-        """Send a message on the multicast network."""
-        msg = Message(self._uuid, type, data)
-        msg = Broadcaster.MAGIC + msg.encode()
-        return await self._udp.sendto(msg, self._address)
-
-    def stop(self):
-        """Stops multicaster."""
-        super().stop()
-        self._udp.close()
 
 
 class Listener(Looper):
@@ -356,27 +159,27 @@ class Router(Looper):
         self._peers = {}
 
         group, port = key_to_multicast(group, family=ip_family)
-        #self._caster = Multicaster(group, port, loop=loop)
+        # self._caster = Multicaster(group, port, loop=loop)
         self._caster = Broadcaster(port, loop=loop)
 
         listen = '::' if ip_family == 'ipv6' else '0.0.0.0'
         self._listener = Listener(listen, 0, loop=loop)
         self._listener.on_message('send', self._send_callback)
 
-        self._caster.on_cast('heartbeat', self._heartbeat_callback)
+        self._caster.on_recv('heartbeat', self._heartbeat_callback)
         self.add_daemon_task(self._heartbeat_daemon)
         if HEARTBEAT_DEBUG:
             self.add_daemon_task(self._heartbeat_debug)
 
         self._subscriptions = []
-        self._caster.on_cast('publish', self._publish_callback)
+        self._caster.on_recv('publish', self._publish_callback)
         self.message_callbacks = []
         self._connections = {}
         self._pending_connections = {}
 
     async def publish(self, topic, data):
         """Publish a message to a topic."""
-        return await self._caster.cast('publish', {
+        return await self._caster.send('publish', {
             'topic': '{}/{}'.format(self.name, topic),
             'data': data
         })
@@ -459,7 +262,7 @@ class Router(Looper):
     async def _heartbeat_daemon(self):
         """Daemon task for heartbeat sending."""
         while True:
-            await self._caster.cast('heartbeat', {
+            await self._caster.send('heartbeat', {
                 'source': self.name,
                 'listen': self._listener.address[1],
             })
