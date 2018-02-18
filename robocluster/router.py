@@ -14,44 +14,8 @@ from .message import Message
 from .ports.caster import Multicaster, Broadcaster
 
 
+BUFFER_SIZE = 1024
 HEARTBEAT_DEBUG = True
-
-
-class Caster(ABC, Looper):
-    """Caster for handling broadcast like communication."""
-
-    def __init__(self, loop=None):
-        super().__init__(loop=loop)
-        self._uuid = str(uuid4())
-        self._callbacks = {}
-
-        self.add_daemon_task(self._recv_daemon)
-
-    async def _recv_daemon(self):
-        while True:
-            try:
-                msg, other = await self._recv()
-                if msg.type not in self._callbacks:
-                    continue
-                if msg.source == self._uuid:
-                    continue
-                self.create_task(self._callbacks[msg.type](other, msg))
-            except BlockingIOError:
-                break
-
-    @abstractmethod
-    async def _recv(self):
-        """Receive a message. Returns message and source."""
-        pass
-
-    @abstractmethod
-    async def cast(self, data):
-        """Send a message."""
-        pass
-
-    def on_cast(self, type, callback):
-        """Add a callback to a message type."""
-        self._callbacks[type] = as_coroutine(callback)
 
 
 class Listener(Looper):
