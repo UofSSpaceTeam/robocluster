@@ -14,7 +14,6 @@ from .message import Message
 from .ports.caster import Multicaster, Broadcaster
 
 
-BUFFER_SIZE = 1024
 HEARTBEAT_DEBUG = True
 
 

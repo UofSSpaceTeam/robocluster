@@ -7,6 +7,7 @@ from ..net import AsyncSocket, key_to_multicast
 from ..message import Message
 from ..util import ip_info
 
+BUFFER_SIZE = 1024
 
 class Multicaster(Port):
     def __init__(self, group, port, loop=None):
@@ -123,7 +124,6 @@ class Broadcaster(Port):
 
     async def _recv(self):
         msg, other = await self._udp.recvfrom(BUFFER_SIZE)
-        print('read')
         if msg[:4] != Broadcaster.MAGIC:
             raise ValueError('Invalid broadcast magic.')
         msg = Message.from_bytes(msg[4:])
@@ -133,7 +133,6 @@ class Broadcaster(Port):
         """Send a message on the multicast network."""
         msg = Message(self._uuid, type, data)
         msg = Broadcaster.MAGIC + msg.encode()
-        # print('sending ', msg)
         return await self._udp.sendto(msg, self._address)
 
     def stop(self):
