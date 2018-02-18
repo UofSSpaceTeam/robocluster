@@ -24,6 +24,19 @@ At some point (soon?) we'll put this on PyPi, but for now you can install robocl
 1. From the project root, do `pip install -e .`.
 1. Run the `examples/device.py` script to confirm everything works. It should print random numbers to the console.
 
+If you have difficulty getting robocluster to run on your machine, you can try running it in a virtual machine.
+A configutation file for [vagrant](https://www.vagrantup.com/) is provided for easy setup of a VM.
+Install Vagrant and a VM provisioner such as [VirtualBox](https://www.virtualbox.org/) or [VMware](https://www.vmware.com/),
+and run:
+``` bash
+vagrant up # This will take a while the first time to install the VM
+vagrant ssh
+```
+You are now in a virtual machine and can cd to /vagrant where the source code is synced.
+The Vagrant config is set up to bridge your internet connection to the VM, so you may be prompted to select
+a network interface. This _should_ allow the VM to interact over your local network just like any other
+physical machine.
+
 ## Contributing
 Create a branch off of `dev` and make changes from there.
 When your change is done, and you want feedback, submit a pull request to merge your branch into `dev`,
