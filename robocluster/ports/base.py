@@ -5,6 +5,8 @@ from uuid import uuid4
 from ..loop import Looper
 from ..message import Message
 
+BUFFER_SIZE = 1024
+
 class Port(ABC, Looper):
     """
     Handles connection over a transport medium

@@ -12,9 +12,10 @@ from .net import AsyncSocket, key_to_multicast
 from .util import as_coroutine, ip_info
 from .message import Message
 from .ports.caster import Multicaster, Broadcaster
+from .ports.base import BUFFER_SIZE
+from .ports.tcp import TcpConnection
 
 
-BUFFER_SIZE = 1024
 HEARTBEAT_DEBUG = True
 
 
@@ -34,6 +35,7 @@ class Listener(Looper):
         """
         super().__init__(loop=loop)
         self._callbacks = {}
+        self._conn_handler = None
 
         family, addr = ip_info(host)
         self._socket = AsyncSocket(family, socket.SOCK_STREAM, loop=loop)
@@ -46,23 +48,16 @@ class Listener(Looper):
         while True:
             print('listen {}'.format(self.address))
             conn, _ = await self._socket.accept()
-            conn = Connection(conn)
-            self.create_task(self._handle_connection(conn))
+            conn = TcpConnection(conn)
+            if self._conn_handler is not None:
+                self._conn_handler(conn)
+            # self.create_task(self._handle_connection(conn))
 
-    async def _handle_connection(self, conn):
-        while True:
-            try:
-                msg = await conn.read()
-                print(msg)
-                if msg.type in self._callbacks:
-                    self.create_task(self._callbacks[msg.type](msg.source, msg))
-            except Exception as e:
-                print(e)
-                break
-        conn.close()
+    def on_connection(self, callback):
+        self._conn_handler = callback
 
-    def on_message(self, type, callback):
-        self._callbacks[type] = as_coroutine(callback)
+    # def on_message(self, type, callback):
+    #     self._callbacks[type] = as_coroutine(callback)
 
     @property
     def address(self):
@@ -70,35 +65,6 @@ class Listener(Looper):
 
     def stop(self):
         super().stop()
-        self._socket.close()
-
-
-class Connection:
-    """Connection wrapper for bare AsyncSocket."""
-
-    def __init__(self, sock):
-        """Initialize the connection from a bare socket."""
-        self._socket = sock
-
-    @classmethod
-    async def from_addr(cls, host, port, loop=None):
-        """Connect to a listening server by host and port."""
-        family, host = ip_info(host)
-        sock = AsyncSocket(family, socket.SOCK_STREAM, loop=loop)
-        await sock.connect((str(host), port))
-        return cls(sock)
-
-    async def write(self, msg):
-        """Write a message to the connection."""
-        print('Sending: {}'.format(msg))
-        return await self._socket.send(msg.encode())
-
-    async def read(self):
-        """Read a message from the connection."""
-        return Message.from_bytes(await self._socket.recv(BUFFER_SIZE))
-
-    def close(self):
-        """Close the connection."""
         self._socket.close()
 
 
@@ -127,7 +93,9 @@ class Router(Looper):
 
         listen = '::' if ip_family == 'ipv6' else '0.0.0.0'
         self._listener = Listener(listen, 0, loop=loop)
-        self._listener.on_message('send', self._send_callback)
+        self._listener.on_connection(self._initialize_connection)
+
+        self._recv_ports = []
 
         self._caster.on_recv('heartbeat', self._heartbeat_callback)
         self.add_daemon_task(self._heartbeat_daemon)
@@ -156,7 +124,7 @@ class Router(Looper):
             'data': data
         }
         msg = Message(self.name, 'send', _data)
-        await self._connections[dest].write(msg)
+        await self._connections[dest].send(msg)
 
     async def _publish_callback(self, other, msg):
         """Handle published messages and start tasks for each callback."""
@@ -171,6 +139,7 @@ class Router(Looper):
     async def _send_callback(self, other, msg):
         """Handle direct messages and start tasks for each callback."""
         #TODO This is just a copy of _publish_callback
+        print(msg)
         topic = msg.data['topic']
         data = msg.data['data']
         for key, coro in self._subscriptions:
@@ -178,6 +147,12 @@ class Router(Looper):
                 self._loop.create_task(coro(topic, data))
         for callback in self.message_callbacks:
             await callback(msg)
+
+    def _initialize_connection(self, conn):
+        print('Connection from ', conn._socket)
+        conn.on_recv('send', self._send_callback)
+        conn.start()
+        self._recv_ports.append(conn)
 
     def on_message(self, callback):
         """Add a handler to be called when the router receives a message."""
@@ -206,7 +181,7 @@ class Router(Looper):
             await self._pending_connections[name]
             del self._pending_connections[name]
             # raise RuntimeError('peer not available')
-        self._connections[name] = await Connection.from_addr(*self._peers[name]['listen'])
+        self._connections[name] = await TcpConnection.from_addr(*self._peers[name]['listen'])
         print('Connected to {}'.format(self._peers[name]['listen']))
 
     HEARTBEAT_RATE = 0.1
@@ -263,3 +238,5 @@ class Router(Looper):
         super().stop()
         self._caster.stop()
         self._listener.stop()
+        for p in self._recv_ports:
+            p.stop()

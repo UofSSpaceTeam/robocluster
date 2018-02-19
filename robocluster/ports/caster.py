@@ -2,12 +2,11 @@ import socket
 import struct
 from contextlib import suppress
 
-from .base import Port
+from .base import Port, BUFFER_SIZE
 from ..net import AsyncSocket, key_to_multicast
 from ..message import Message
 from ..util import ip_info
 
-BUFFER_SIZE = 1024
 
 class Multicaster(Port):
     def __init__(self, group, port, loop=None):
