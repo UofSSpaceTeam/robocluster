@@ -5,6 +5,7 @@ import json
 
 import pyvesc
 from pyvesc import ExampleSendMessage
+import robocluster.util; robocluster.util.DEBUG = True
 
 from robocluster import SerialDriver, Device
 
@@ -26,7 +27,7 @@ def test_serial_write():
     time.sleep(0.2)
     msg = os.read(master, 100)
     print(msg)
-    assert(json.loads(msg.decode('utf-8')) == TEST_DATA)
+    assert(json.loads(msg.decode('utf-8'))['data'] == TEST_DATA)
     device.stop()
 
 def test_serial_read():
@@ -84,4 +85,4 @@ def test_vesc_write():
     device.stop()
 
 if __name__ ==  '__main__':
-    test_serial_write()
+    test_serial_read()

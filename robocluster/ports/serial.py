@@ -4,6 +4,7 @@ import pyvesc
 import serial
 import serial_asyncio
 
+from .base import Port
 from ..util import debug
 
 class SerialPort(Port):
@@ -16,7 +17,7 @@ class SerialPort(Port):
         self._reader = None  # once initialized, an asyncio.StreamReader
         self._writer = None  # once initialized, an asyncio.StreamWriter
         self.encoding = encoding
-        self._loop.create_task(self._init_serial(disable_receive_loop))
+        self._loop.create_task(self._init_serial())
         super().__init__(loop=loop)
 
     async def _init_serial(self):
@@ -38,6 +39,7 @@ class SerialPort(Port):
         if not self._reader:
             raise RuntimeError("Serial reader not initialized yet")
         try:
+            debug('reading')
             _message = None
             if self.encoding == 'json':
                 pkt = ''
@@ -68,7 +70,7 @@ class SerialPort(Port):
                 header = await self._reader.read(1)
                 # magic VESC header must be 2 or 3
                 if not to_int(header) == 2 or to_int(header) == 3:
-                    continue  # raise error maybe?
+                    raise RuntimeError('Got invalide VESC message')
                 length = await self._reader.read(to_int(header) - 1)
                 packet = await self._reader.read(to_int(length) + 4)
                 msg, _ = pyvesc.decode(header + length + packet)
@@ -95,13 +97,13 @@ class SerialPort(Port):
         except serial.serialutil.SerialException:
             print('serial disconnect')
             self._reader = None
-            while self._reader == None:
+            while self._reader is None:
                 await self._init_serial()
 
-    def send(self, msg):
+    async def send(self, msg):
         """Write a packet to the port"""
         if not self._writer:
             raise RuntimeError("Serial writer not initialized yet")
-        debug("Sending packet {}".format(packet))
-        self._writer.write(msg.encode())
+        debug("Sending packet {}".format(msg))
+        return self._writer.write(msg.encode())
 

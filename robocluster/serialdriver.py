@@ -7,7 +7,8 @@ import serial_asyncio
 
 from .device import Device
 from .util import debug
-from .router import Message
+from .message import Message
+from .ports.serial import SerialPort
 
 
 class SerialDriver(Device):
@@ -15,10 +16,12 @@ class SerialDriver(Device):
 
     def __init__(self, name, group, loop=None, encoding='json', disable_receive_loop=False):
         super().__init__(name, group, loop=loop)
-        self.serial_connection = SerialConnection(name,
+        self.serial_port = SerialPort(name,
                 encoding=encoding, loop=self._loop,
                 disable_receive_loop=disable_receive_loop)
-        self.serial_connection.packet_callback = self.handle_packet
+        self.serial_port.on_recv('send', self.handle_packet)
+        self.serial_port.on_recv('publish', self.handle_packet)
+        self.serial_port.on_recv('heartbeat', self.handle_packet)
         self.encoding = encoding
         self._router.on_message(self.forward_packet)
 
@@ -33,12 +36,10 @@ class SerialDriver(Device):
 
     async def forward_packet(self, packet):
         """Forwards messages from robocluster network to serial device."""
-        await self.serial_connection.write(packet.to_json())
+        await self.serial_port.send(packet.to_json())
 
     async def write(self, data):
         """Write to the serial device."""
-        await self.serial_connection.write(data)
-
-    async def read(self, num_bytes=1):
-        """Read a byte from the serial device"""
-        return self.serial_connection.read(num_bytes)
+        #TODO: the message creation is wrong...
+        msg = Message(self.name, 'publish', data)
+        await self.serial_port.send(msg)
