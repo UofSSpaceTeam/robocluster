@@ -23,16 +23,14 @@ class Port(ABC, Looper):
 
     async def _recv_daemon(self):
         while True:
-            try:
-                msg, source = await self._recv()
-                if msg.type not in self._callbacks:
-                    continue
-                if msg.source == self._uuid:
-                    continue
-                for cb in self._callbacks[msg.type]:
-                    self.create_task(cb(source, msg))
-            except BlockingIOError:
-                break
+            # TODO: we need to do some good error checking here...
+            msg, source = await self._recv()
+            if msg.type not in self._callbacks:
+                continue
+            if msg.source == self._uuid:
+                continue
+            for cb in self._callbacks[msg.type]:
+                self.create_task(cb(source, msg))
 
     @abstractmethod
     async def _recv(self):

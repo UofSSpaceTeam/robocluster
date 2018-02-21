@@ -16,6 +16,7 @@ from .ports.base import BUFFER_SIZE
 from .ports.tcp import TcpConnection
 
 
+USE_MULTICAST = False
 HEARTBEAT_DEBUG = True
 
 
@@ -88,8 +89,10 @@ class Router(Looper):
         self._peers = {}
 
         group, port = key_to_multicast(group, family=ip_family)
-        # self._caster = Multicaster(group, port, loop=loop)
-        self._caster = Broadcaster(port, loop=loop)
+        if USE_MULTICAST:
+            self._caster = Multicaster(group, port, loop=loop)
+        else:
+            self._caster = Broadcaster(port, loop=loop)
 
         listen = '::' if ip_family == 'ipv6' else '0.0.0.0'
         self._listener = Listener(listen, 0, loop=loop)

@@ -59,7 +59,7 @@ class Multicaster(Port):
     async def _recv(self):
         msg, other = await self._udp_recv.recvfrom(BUFFER_SIZE)
         msg = Message.from_bytes(msg)
-        return msg
+        return msg, other
 
     async def send(self, type, data):
         """Send a message on the multicast network."""
