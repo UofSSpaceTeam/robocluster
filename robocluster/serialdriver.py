@@ -24,8 +24,9 @@ class SerialDriver(Device):
         self.serial_port.on_recv('heartbeat', self.handle_packet)
         self.encoding = encoding
         self._router.on_message(self.forward_packet)
+        self.serial_port.start()
 
-    async def handle_packet(self, message):
+    async def handle_packet(self, other, message):
         """Forward messages from serial to robocluster network."""
         print(message)
         if message.type == 'heartbeat':
@@ -41,5 +42,8 @@ class SerialDriver(Device):
     async def write(self, data):
         """Write to the serial device."""
         #TODO: the message creation is wrong...
-        msg = Message(self.name, 'publish', data)
+        if self.encoding == 'json':
+            msg = Message(self.name, 'publish', data)
+        elif self.encoding == 'vesc':
+            msg = data
         await self.serial_port.send(msg)

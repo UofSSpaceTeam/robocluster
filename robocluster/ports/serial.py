@@ -6,6 +6,7 @@ import serial_asyncio
 
 from .base import Port
 from ..util import debug
+from ..message import Message
 
 class SerialPort(Port):
     """Handles reading and writing to a serial device"""
@@ -18,7 +19,7 @@ class SerialPort(Port):
         self._writer = None  # once initialized, an asyncio.StreamWriter
         self.encoding = encoding
         self._loop.create_task(self._init_serial())
-        super().__init__(loop=loop)
+        super().__init__(loop=self._loop)
 
     async def _init_serial(self):
         """Initialize the StreamReader and StreamWriter."""
@@ -39,7 +40,6 @@ class SerialPort(Port):
         if not self._reader:
             raise RuntimeError("Serial reader not initialized yet")
         try:
-            debug('reading')
             _message = None
             if self.encoding == 'json':
                 pkt = ''
@@ -105,5 +105,10 @@ class SerialPort(Port):
         if not self._writer:
             raise RuntimeError("Serial writer not initialized yet")
         debug("Sending packet {}".format(msg))
-        return self._writer.write(msg.encode())
+        if self.encoding == 'json':
+            return self._writer.write(msg.encode())
+        elif self.encoding == 'vesc':
+            return self._writer.write(pyvesc.encode(msg))
+        else:
+            raise RuntimeError('Encoding not supported')
 
