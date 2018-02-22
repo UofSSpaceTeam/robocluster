@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from uuid import uuid4
 
 from ..loop import Looper
 from ..message import Message
+
 
 BUFFER_SIZE = 1024
 
@@ -14,10 +14,11 @@ class Port(ABC, Looper):
     Reads in bytes from the medium, and emits messages for a router.
     """
 
-    def __init__(self, loop=None):
+    def __init__(self, codec='json', loop=None):
         super().__init__(loop=loop)
-        self._uuid = str(uuid4())
-        self._callbacks = defaultdict(list)
+
+        self.codec = codec
+        self._callbacks = defaultdict(set)
 
         self.add_daemon_task(self._recv_daemon)
 
@@ -34,20 +35,26 @@ class Port(ABC, Looper):
 
     @abstractmethod
     async def _recv(self):
-        """Receive a message. Returns message and source."""
+        """Receive a Message from the port."""
         pass
 
     @abstractmethod
-    async def send(self, type, data):
-        """Send a message."""
+    async def send(self, msg):
+        """Send a Message."""
         pass
 
     def on_recv(self, type, callback):
         """Add a callback for a message type when received"""
-        self._callbacks[type].append(callback)
+        self._callbacks[type].add(callback)
 
     def remove_recv_callback(self, type, callback):
-        """Removes a callback for a message type"""
-        for c in self._callbacks[type]:
-            if c == callback:
-                self._callbacks[type].remove(c)
+        """
+        Removes a callback for a message type.
+
+        Note: This operation is idempotent.
+        """
+        if type in self._callbacks:
+            self._callbacks[type].discard(callback)
+            if not self._callbacks[type]:
+                # remove the type if there are no callbacks if empty
+                del self._callbacks[type]
