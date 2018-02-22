@@ -1,59 +1,86 @@
-import json
-
-
 class Message:
     """Base message type for network."""
 
-    def __init__(self, source, type, data):
+    def __init__(self, type, source, dests, endpoint, data):
         """
         Initialize a message.
 
         Arguments:
+            type: message type (str)
             source: source of message (str)
+            dests: destinations of message (list(str))
             type: message type (str)
             data: JSON encodable data.
         """
-        self.source = source
         self.type = type
+        self.source = source
+        self.dests = dest
+        self.endpoint = endpoint
         self.data = data
 
-    @classmethod
-    def from_bytes(cls, msg, encoding='json'):
-        """Create a Message from bytes."""
-        try:
-            return cls.from_string(msg.decode())
-        except UnicodeDecodeError:
-            raise ValueError('Invalid utf-8.')
+    def __iter__(self):
+        yield 'type', self.type
+        yield 'source', self.source
+        yield 'dests', self.dests
+        yield 'endpoint', self.endpoint
+        yield 'data', self.data
 
     @classmethod
-    def from_string(cls, msg):
-        """Create a Message from a utf-8 string."""
+    def decode(cls, codec, raw):
         try:
-            packet = json.loads(msg)
-        except json.JSONDecodeError:
-            raise ValueError('Invalid JSON.')
+            decode = getattr(self, 'from_' + codec)
+        except AttributeError:
+            err = 'decoder for {}'.format(codec)
+            raise NotImplementedError(err)
+        return decode(raw)
 
-        if any(k not in packet for k in ('source', 'type', 'data')):
-            raise ValueError('Improperly formatted message.')
-
-        return cls(packet['source'], packet['type'], packet['data'])
-
-    def encode(self):
+    def encode(self, codec):
         """Encode the message to bytes."""
-        return self.to_json().encode()
+        try:
+            encode = getattr(self, 'to_' + codec)
+        except AttributeError:
+            err = 'encoder for {}'.format(codec)
+            raise NotImplementedError(err)
+        return encode()
 
-    def to_json(self):
-        return json.dumps({
-            'source': self.source,
-            'type': self.type,
-            'data': self.data,
-        })
+    @classmethod
+    def from_dict(cls, d)
+        return cls(
+            d['type'],
+            d['source'],
+            d['dests'],
+            d['endpoint'],
+            d['data'],
+        )
+
+    def to_dict(self):
+        return dict(self)
+
+    @classmethod
+    def from_json(cls, raw):
+        from json import loads
+        return cls.from_dict(loads(raw))
+
+    def to_json(self, source):
+        from json import dumps
+        return dumps(self.to_dict())
+
+    @classmethod
+    def from_msgpack(cls, raw):
+        from msgpack import unpackb
+        return cls.from_dict(unpackb(raw))
+
+    def to_msgpack(self):
+        from msgpack import packb
+        return packb(self.to_dict())
 
     def __repr__(self):
-        return '{}({!r}, {!r}, {!r})'.format(
+        return '{}({!r}, {!r}, {!r}, {!r}, {!r})'.format(
             self.__class__.__name__,
-            self.source,
             self.type,
+            self.source,
+            self.dests,
+            self.endpoint,
             self.data
         )
 
