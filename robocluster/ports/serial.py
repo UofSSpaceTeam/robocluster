@@ -42,25 +42,8 @@ class SerialPort(Port):
         try:
             _message = None
             if self.encoding == 'json':
-                pkt = ''
-                curleystack = 0
-                squarestack = 0
-                done_reading = False
-                while not done_reading:
-                    b = await self._reader.read(1)
-                    b = b.decode()
-                    if b == '{':
-                        curleystack += 1
-                    elif b == '}':
-                        curleystack -= 1
-                    elif b == '[':
-                        squarestack += 1
-                    elif b == ']':
-                        squarestack -= 1
-                    pkt += b
-                    if curleystack == 0 and squarestack == 0:
-                        done_reading = True
-                _message = Message.from_string(pkt)
+                pkt = await self._reader.readline()
+                _message = Message.from_string(pkt.strip().decode())
                 if _message.type == 'heartbeat':
                     self.name = _message.source
             elif self.encoding == 'vesc':
@@ -93,12 +76,14 @@ class SerialPort(Port):
                 raise RuntimeError('Encoding is not supported')
             debug("Got packet {}".format(_message))
             return _message, _message.source
-
+        except ValueError:
+            return None, None
         except serial.serialutil.SerialException:
             print('serial disconnect')
             self._reader = None
             while self._reader is None:
                 await self._init_serial()
+            return await self._recv()
 
     async def send(self, msg):
         """Write a packet to the port"""

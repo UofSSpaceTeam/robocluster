@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from uuid import uuid4
 
 from ..loop import Looper
 from ..message import Message
@@ -17,6 +18,8 @@ class Port(ABC, Looper):
     def __init__(self, codec='json', loop=None):
         super().__init__(loop=loop)
 
+        self._uuid = str(uuid4())
+
         self.codec = codec
         self._callbacks = defaultdict(set)
 
@@ -26,6 +29,8 @@ class Port(ABC, Looper):
         while True:
             # TODO: we need to do some good error checking here...
             msg, source = await self._recv()
+            if msg is None:
+                continue
             if msg.type not in self._callbacks:
                 continue
             if msg.source == self._uuid:
