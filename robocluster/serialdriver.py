@@ -28,7 +28,6 @@ class SerialDriver(Device):
 
     async def handle_packet(self, other, message):
         """Forward messages from serial to robocluster network."""
-        print(message)
         if message.type == 'heartbeat':
             self.name = message.source
             self._router.name = self.name

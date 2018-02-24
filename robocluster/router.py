@@ -17,7 +17,7 @@ from .ports.tcp import TcpConnection
 
 
 USE_MULTICAST = False
-HEARTBEAT_DEBUG = True
+HEARTBEAT_DEBUG = False
 
 
 class Listener(Looper):
@@ -142,7 +142,6 @@ class Router(Looper):
     async def _send_callback(self, other, msg):
         """Handle direct messages and start tasks for each callback."""
         #TODO This is just a copy of _publish_callback
-        print(msg)
         topic = msg.data['topic']
         data = msg.data['data']
         for key, coro in self._subscriptions:
