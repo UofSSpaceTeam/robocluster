@@ -1,7 +1,7 @@
 '''Example of a files that configures the processes and runs them'''
-from ProcessManager import ProcessManager, RunOnce
+from robocluster.manager.ProcessManager import ProcessManager, RunOnce
 
-PATH = './examples/demo'
+PATH = './demo'
 
 process_list = [
     RunOnce("random-stream", 'python3 {}/random_stream.py'.format(PATH)),
