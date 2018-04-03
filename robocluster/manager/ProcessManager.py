@@ -124,6 +124,7 @@ class ProcessManager:
         self.processes = {}  # store processes by name
         self._futures = []
         self.remote_api_device = Device('remote-api', 'Manager')
+        self.loop = asyncio.get_event_loop()
 
         @self.remote_api_device.on('*/createProcess')
         async def remote_createProcess(event, data):
@@ -207,29 +208,5 @@ class ProcessManager:
     def run(self):
         """Run the event loop"""
         self.remote_api_device.start()
-        self.loop = asyncio.get_event_loop()
         self.loop.run_forever()
 
-
-def main():
-    """Run a process manager in the foreground."""
-    process_list = [
-        RunOnce('sleep', 'python sleeper.py'),
-        RunOnce("printer", "python ./examples/processes/print_periodically.py 1 4"),
-        # RestartOnCrash('crasher', 'python crash.py')
-    ]
-
-    with ProcessManager() as manager:
-        """Initialize all the processes"""
-        for proc in process_list:
-            manager.addProcess(proc)
-
-        manager.start()
-
-        try:
-            manager.run()
-        except KeyboardInterrupt:
-            pass
-
-if __name__ == "__main__":
-    exit(main())
