@@ -1,0 +1,10 @@
+﻿################################################################################
+# Ce fichier .gitignore a été automatiquement créé par Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs/VSWorkspaceState.json
+/.vs/robocluster-manger/v15/.suo
+/.vs/ProjectSettings.json
+/.vs/slnx.sqlite
+/.vs/robocluster-manager/v15/.suo
+__pycache__
