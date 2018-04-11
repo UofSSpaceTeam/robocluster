@@ -8,7 +8,7 @@ from functools import wraps
 from threading import Thread
 
 from .util import duration_to_seconds, as_coroutine
-from .ports import MulticastPort, SerialPort, EgressTcpPort, IngressTcpPort
+from .router import Router
 
 class AttributeDict(dict):
     """
@@ -44,27 +44,14 @@ class Device:
         self.name = name
         self.events = defaultdict(list)
 
-        self.events['*SEND_REQUEST'].append({
-            'task': self._on_send_request,
-            'port': ['multicast']
-        })
-
-        self.events['*SEND_CONFIRM'].append({
-            'task': self._on_send_confirm,
-            'port': ['tcp']
-        })
-
         self._thread = None
         self._loop = loop if loop else asyncio.new_event_loop()
 
         self._packet_queue = asyncio.Queue(loop=self._loop)
 
-        self.ports = {
-                'multicast': MulticastPort(name, group, self.transport,
-                    self._packet_queue, self._loop)
-        }
-        self.create_ingress_tcp('tcp')
-        self._loop.create_task(self.ports['multicast'].enable())
+        self._router = Router(self.name, group, loop=self._loop)
+
+        self.ports = {}
 
         self.__storage = AttributeDict()
 
@@ -92,18 +79,7 @@ class Device:
                 publish over multiple ports.
                 Defaults to 'multicast'.
         """
-        packet = {
-            'event': '{}/{}'.format(self.name, topic),
-            'data': data,
-        }
-        if port == '*':
-            for p in self.ports:
-                await p.write(packet)
-        else:
-            if isinstance(port, str):
-                port = [port]
-            for p in port:
-                await self.ports[p].write(packet)
+        await self._router.publish(topic, data)
 
     async def send(self, dest, topic, data):
         """
@@ -118,17 +94,7 @@ class Device:
                 over the network. For the default json encoding,
                 dictionaries are a good way to package data.
         """
-        if dest not in self.ports:
-            self.create_egress_tcp(dest)
-        if self.ports[dest].encoding == 'json':
-            packet = {
-                'event': '{}/{}'.format(self.name, topic),
-                'data': data
-            }
-            await self.ports[dest].write(packet)
-        else:
-            # encodings like vesc or raw shouldn't be put in a dictionary.
-            await self.ports[dest].write(data)
+        await self._router.send(dest, topic, data)
 
     async def request(self, dest, topic):
         """
@@ -192,14 +158,8 @@ class Device:
                 listen to multiple ports.
                 Defaults to None, which listens to all ports.
         """
-        if isinstance(ports, str):
-            ports = [ports]
         def _decorator(callback):
-            coro = {
-                'task': as_coroutine(callback),
-                'port': ports
-            }
-            self.events[event].append(coro)
+            self._router.subscribe(event, callback)
             return callback
         return _decorator
 
@@ -259,108 +219,6 @@ class Device:
         seconds = duration_to_seconds(duration)
         return asyncio.sleep(seconds, loop=self._loop)
 
-    async def _callback_handler(self):
-        """Recieve packets and call the appropriate callbacks."""
-        while True:
-            try:
-                packet = await self._packet_queue.get()
-                event, data = packet['event'], packet['data']
-                for key, callbacks in self.events.items():
-                    if not fnmatch(event, key):
-                        continue
-                    for callback in callbacks:
-                        if callback['port'] is None or packet['port'] in callback['port']:
-                            self._loop.create_task(callback['task'](event, data))
-            except KeyError:
-                print("Callback handler KeyError")
-
-    def create_serial(self, usb_path, encoding=transport):
-        """Create a new SerialDevice."""
-        self.ports[usb_path] = SerialPort(
-            name=usb_path,
-            encoding=encoding,
-            packet_queue=self._packet_queue,
-            loop=self._loop
-        )
-        self._loop.create_task(self.ports[usb_path].enable())
-
-    def create_ingress_tcp(self, device_name, encoding=transport):
-        """Create a new incomming tcp port."""
-        self.ports[device_name] = IngressTcpPort(
-            name=device_name,
-            encoding=encoding,
-            packet_queue=self._packet_queue,
-            loop=self._loop
-        )
-        self._loop.create_task(self.ports[device_name].enable())
-
-    def create_egress_tcp(self, device_name, encoding=transport):
-        """Create a new tcp for outgoing data."""
-        self.ports[device_name] = EgressTcpPort(
-            name=device_name,
-            encoding=encoding,
-            loop=self._loop
-        )
-        async def send_request():
-            async with self.ports['tcp'] as ingress:
-                sockname = ingress.getsockname()
-                await self.publish('SEND_REQUEST', {
-                    'requested-device': device_name,
-                    'sender-address': sockname[0],
-                    'sender-port': sockname[1],
-                    'sender-name': self.name,
-                    'encoding': encoding
-                })
-        self._loop.create_task(send_request())
-
-    async def _on_send_request(self, event, data):
-        """
-        Callback for the SEND_REQUEST event.
-        If another device is looking for this device,
-        this callback connects to the other device and
-        sends it the information on how to contact this device.
-        """
-        try:
-            if data['requested-device'] == self.name:
-                sender_name = data['sender-name']
-                # Create a new egress port for the sender
-                self.ports[sender_name] = EgressTcpPort(
-                    name=sender_name,
-                    encoding=data['encoding'],
-                    loop=self._loop
-                )
-                async with self.ports['tcp'] as ingress:
-                    sockname = ingress.getsockname()
-                    # enable the port to the sender
-                    await self.ports[sender_name].enable(
-                        host=data['sender-address'],
-                        port=data['sender-port']
-                    )
-                    # Send them our connection information
-                    await self.ports[sender_name].write({
-                        'event': 'SEND_CONFIRM',
-                        'data': {
-                            'name': self.name,
-                            'address': sockname[0],
-                            'port': sockname[1]
-                        }
-                    })
-        except KeyError:
-            print("Got a KeyError while handling a SEND_REQUEST")
-
-    async def _on_send_confirm(self, event, data):
-        """
-        Callback for the SEND_CONFIRM event.
-        Enables a port that was waiting for a tcp address.
-        """
-        try:
-            await self.ports[data['name']].enable(
-                host=data['address'],
-                port=data['port']
-            )
-        except KeyError:
-            print("Got a KeyError while handling a SEND_CONFIRM")
-
     def start(self):
         """Start device."""
         if self._thread:
@@ -372,10 +230,11 @@ class Device:
         """Target for thread to run event loop in background."""
         loop = self._loop
         asyncio.set_event_loop(loop)
+        self._router.start()
 
-        loop.create_task(self._callback_handler())
         loop.run_forever()
 
+        self._router.stop()
         for task in asyncio.Task.all_tasks(loop=loop):
             task.cancel()
             with suppress(asyncio.CancelledError):

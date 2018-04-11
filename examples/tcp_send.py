@@ -1,15 +1,21 @@
 from robocluster import Device
-# import robocluster.util; robocluster.util.DEBUG = True
+import robocluster.util; robocluster.util.DEBUG = True
 
-device = Device('test', 'rover')
-device.create_egress_tcp('test') # This can be left out
+sender = Device('sender', 'rover')
+getter = Device('getter', 'rover')
 
-@device.every('1s')
+@sender.every('1s')
 async def send():
-    await device.send('test', 'test', 1234)
+    await sender.send('getter', 'test', 1234)
 
-@device.on('*/test', ports='test_tcp')
+@getter.on('*test')
 async def callback(event, data):
     print("event {}, data {}".format(event, data))
 
-device.run()
+try:
+    sender.start()
+    getter.start()
+except KeyboardInterrupt:
+    sender.stop()
+    getter.stop()
+

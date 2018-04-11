@@ -243,10 +243,9 @@ And finally run the devices::
 Serial Device Communication
 ---------------------------
 
+.. note:: The microcontroller side of this will change in the near future.
+
 Now we'll look at how to talk to a serial device with robocluster.
-This will likely change in the future as we port some of the functionality
-of robocluster for microcontrollers, but for now we will just go over the
-``serial_test.py`` found in the examples folder in the robocluster repo.
 For this you will need an Arduino with the following code on it:
 
 ::
@@ -256,72 +255,95 @@ For this you will need an Arduino with the following code on it:
 
     StaticJsonBuffer<200> jsonBuffer;
     JsonObject& root = jsonBuffer.createObject();
+    JsonObject& publish = jsonBuffer.createObject();
 
     void send_message() {
         root.printTo(Serial);
     }
 
+    void send_data() {
+        publish.printTo(Serial);
+    }
+
     void setup() {
         pinMode(13, OUTPUT);
         Serial.begin(115200);
-        root["event"] = "test";
+        root["type"] = "heartbeat";
+        root["source"] = "Teensy1";
         JsonObject& nested = root.createNestedObject("data");
         nested["key1"] = 42;
         root["data"] = nested;
+
+        publish["type"] = "publish";
+        publish["source"] = "Teensy1";
+        JsonObject& pub_nested = publish.createNestedObject("data");
+        pub_nested["topic"] = "Teensy1/sensor1";
+        pub_nested["data"] = 77.4;
+        publish["data"] = pub_nested;
+
     }
 
     void loop() {
         send_message();
         digitalWrite(13, HIGH);
         delay(500);
-        digitalWrite(13, LOW);
+        send_data();
         delay(500);
-        // while(!Serial.available()){}
-        // Serial.read();
+        if(Serial.available() > 1){
+            digitalWrite(13, LOW);
+            while(Serial.available()) {
+                Serial.read();
+            }
+            delay(500);
+        }
     }
 
-This just sends a json packet over serial every second that looks like this::
-
-    {
-        'event': 'test',
-        'data' : {'key1': 42}
-    }
+This sends a heartbeat every second, and if a message is sent to the Arduino,
+it will sleep for half a second so you can confirm the Arduino received the message.
+It also publishes the topic ``sensor`` every second.
 
 Once this is flashed
 to your Arduino, lets create a device on the python side and set up the serial port::
 
-    from robocluster import Device
+    from robocluster import SerialDriver, Device
 
-    device = Device('link', 'rover')
-    device.create_serial('/dev/ttyACM0')
+    serialDevice = SerialDriver('/dev/ttyACM0', 'rover')
+    tester = Device('tester', 'rover')
 
-``device.create_serial()`` takes in the path to the serial device on Posix systems,
-or the com port on Windows. Change the path to correspond to the Arduino attached
-to your machine. When you call ``device.run()`` it will setup a connection
-to the serial device. Next we define a callback to trigger when ever the
-Arduino sends its message::
+``SerialDriver`` is a special type of virtual device that represents a physical serial
+device on the robocluster network. You initialize it with a path to a serial port
+on Posix systems, or a COM port on Windows, and when SerialDriver receives a heartbeat
+message from the physical device, it will update its name to match the physical device.
+It then behaves like a bridge between the robocluster network and the serial device.
+We created the ``tester`` Device to interact with the serial device.
 
-    @device.on('test')
-    async def callback(event, data):
-        '''Print the event and value'''
-        print(event, data)
+Lets make the ``tester`` virtual device publish some data to the network::
+
+    @tester.every('1s')
+    async def publish_data():
+        await tester.publish('testThings', 27)
+
+And also have it subscribe to the 'sensor1' data the Arduino is publishing::
+
+    @tester.on('*/sensor1')
+    def print_sensor(event, data):
+        print('Sensor 1 data: {}'.format(data))
 
 Finally, add::
 
-    device.run()
+    try:
+        serialDevice.start()
+        tester.start()
+        serialDevice.wait()
+        tester.wait()
+    except KeyboardInterrupt:
+        serialDevice.stop()
+        tester.stop()
 
-and run the script. You should see the event and data printed to the console.
+and run the script. You should see the event and data from the microcontroller
+printed to the console about every 1.5 seconds, and the led on pin 13 of the
+Arduino should blink at the same rate.
 
-To write to serial you have a couple of options. To write data strait to
-the device without the device wrapping the message in the whole 'event' and 'data'
-packet thing, use::
-
-    device.ports['name-of-serial'].write(<the_data>)
-
-If the serial device supports the packet structure that the robocluster device
-uses, you can use::
-
-    device.send('serial-name', 'some-event', <the_data>)
 
 .. _IP Multicast: https://en.wikipedia.org/wiki/IP_multicast
 .. _Python asyncio home: https://docs.python.org/3/library/asyncio.html
