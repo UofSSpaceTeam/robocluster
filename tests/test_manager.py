@@ -1,8 +1,6 @@
-import time
 import asyncio
 
 from robocluster.manager import RunOnce, ProcessManager
-from robocluster import Device
 
 def test_RunOnce():
     proc = RunOnce('echo-test', 'echo "Hello world"')
