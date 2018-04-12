@@ -69,9 +69,3 @@ If you know another device has data or can perform a function that you need,
 you can send a request to that device, and it will respond with the result.
 This can be used as a remote procedure call mechanism, or like a REST API (without HTTP).
 
-.. Robocluster is centered around network sockets, but it also supports serial devices,
-.. and in the future possibly CAN bus, I2C, etc. The serial device is responsible
-.. for implementing the wire protocol such that messages from the general robocluster
-.. network can be passed directly to the serial device, and the serial device
-.. can send messages that can be directly forwarded over the robocluster network.
-
