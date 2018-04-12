@@ -46,7 +46,6 @@ Here is a list of some of the things you can do with Robocluster:
 - Subscribe to a broadcasted message and call a function when that message is published.
 - Send data directly to another virtual device on the network.
 - Request data from another virtual device on the network.
-- Serial USB devices can participate in the network.
 
 In robotics software, you frequently need some task to be ran periodically,
 so Robocluster provides a method to schedule tasks at regular intervals.
@@ -70,9 +69,9 @@ If you know another device has data or can perform a function that you need,
 you can send a request to that device, and it will respond with the result.
 This can be used as a remote procedure call mechanism, or like a REST API (without HTTP).
 
-Robocluster is centered around network sockets, but it also supports serial devices,
-and in the future possibly CAN bus, I2C, etc. The serial device is responsible
-for implementing the wire protocol such that messages from the general robocluster
-network can be passed directly to the serial device, and the serial device
-can send messages that can be directly forwarded over the robocluster network.
+.. Robocluster is centered around network sockets, but it also supports serial devices,
+.. and in the future possibly CAN bus, I2C, etc. The serial device is responsible
+.. for implementing the wire protocol such that messages from the general robocluster
+.. network can be passed directly to the serial device, and the serial device
+.. can send messages that can be directly forwarded over the robocluster network.
 
