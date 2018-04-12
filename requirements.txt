@@ -1,3 +1,1 @@
-# Read the setup.py for install dependencies
--e git+https://github.com/UofSSpaceTeam/PyVESC.git#egg=PyVESC
 .
