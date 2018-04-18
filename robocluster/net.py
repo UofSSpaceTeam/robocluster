@@ -1,13 +1,14 @@
 import asyncio
+import json
+import os
 import socket as socket_m
+import struct
 from functools import partial, wraps
-from hashlib import sha256
-from ipaddress import ip_address
+from contextlib import suppress
 
 
 __all__ = [
     'AsyncSocket',
-    'key_to_multicast',
 ]
 
 
@@ -39,8 +40,8 @@ class AsyncSocket:
         try:
             await self.connect(address)
             return 0
-        except OSError as e:
-            return e.errno
+        except OSError as err:
+            return err.errno
 
     @wraps(socket_m.socket.sendfile)
     async def sendfile(self, *args, **kwargs):
@@ -75,7 +76,7 @@ class AsyncSocket:
         def wrapper(*args, **kwargs):
             remover(fd)
             if future.cancelled():
-                return
+                return future
             try:
                 result = func(*args, **kwargs)
             except (BlockingIOError, InterruptedError):
@@ -88,22 +89,4 @@ class AsyncSocket:
         return wrapper
 
 
-def key_to_multicast(key, family='ipv4'):
-    """Convert a key to a local multicast group."""
-    digest = sha256(key.encode()).digest()
-
-    # grab 2 bytes for port
-    # mask bits 15 and 16 to make port ephemeral (49152-65535)
-    port = int.from_bytes(digest[0:2], byteorder='little') | 0xC000
-
-    if family == 'ipv4':
-        # RFC 5771 states that IPv4 multicast range of 224.0.0.0 to 224.0.0.255
-        # are for use in local subnetworks.
-        addr = b'\xe0\x00\x00' + digest[3:4]
-    elif family == 'ipv6':
-        # TODO: cite RFC for IPv6 multicast
-        addr = b'\xff\x13\x00\x00' + digest[3:15]
-    else:
-        raise ValueError('unknown family')
-
-    return str(ip_address(addr)), port
+key_to_multicast = None

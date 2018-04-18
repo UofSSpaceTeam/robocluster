@@ -81,13 +81,17 @@ class Looper:
 
         When loop is omitted, the current event loop is used.
         """
-        self._loop = loop if loop else asyncio.get_event_loop()
+        self._loop = loop or asyncio.get_event_loop()
         self._coros = []
         self._tasks = None
 
+    @property
+    def loop(self):
+        return self._loop
+
     def create_task(self, coro):
         """Create a task in the event loop."""
-        return self._loop.create_task(coro)
+        return self.loop.create_task(coro)
 
     def add_daemon_task(self, coro, *args, **kwargs):
         """
@@ -107,17 +111,28 @@ class Looper:
 
         This method is a coroutine.
         """
-        return asyncio.sleep(seconds, loop=self._loop)
+        return asyncio.sleep(seconds, loop=self.loop)
 
     def start(self):
         """Start daemon tasks."""
         if self._tasks is not None:
-            raise RuntimeError('Already running')
+            return
 
         self._tasks = []
         for coro, args, kwargs in self._coros:
-            task = self.create_task(coro(*args, **kwargs))
+            task = self.create_task(self._coro_wrapper(coro, *args, **kwargs))
             self._tasks.append(task)
+
+    async def _coro_wrapper(self, coro, *args, **kwargs):
+        while ...:
+            try:
+                await coro(*args, **kwargs)
+            except asyncio.CancelledError:
+                raise
+            except:
+                import traceback
+                traceback.print_exc()
+                break
 
     def stop(self):
         """Stop daemon tasks."""

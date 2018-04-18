@@ -8,7 +8,6 @@ from functools import wraps
 from threading import Thread
 
 from .util import duration_to_seconds, as_coroutine
-from .router import Router
 
 class AttributeDict(dict):
     """
@@ -49,7 +48,8 @@ class Device:
 
         self._packet_queue = asyncio.Queue(loop=self._loop)
 
-        self._router = Router(self.name, group, loop=self._loop)
+        # TODO: Replace router with Member
+        #self._router = Router(self.name, group, loop=self._loop)
 
         self.ports = {}
 
