@@ -9,12 +9,17 @@ from robocluster.loop import Looper
 
 
 async def amain(name, other, loop):
+    from contextlib import suppress
+    from time import time
+
     member = Member(name, b'deafbeef', 12345)
     member.start()
-    member.wanted.append(other)
     while ...:
         await member.sleep(1)
-        await member.send(other, 'hello', 'hello from: ' + name)
+        with suppress(UnknownPeer):
+            await member.send(other, {
+                "hello": time()
+            })
 
 
 def main():
@@ -30,6 +35,14 @@ def main():
         loop.stop()
 
 
+class Error(Exception):
+    pass
+
+
+class UnknownPeer(Error):
+    pass
+
+
 class Member(Looper):
     def __init__(self, name, gossip_key, gossip_port, loop=None):
         super().__init__(loop)
@@ -40,6 +53,16 @@ class Member(Looper):
         self._peers = {}
         self._connector = _Connector(self)
         self._gossiper = _Gossiper(self, gossip_port, gossip_key)
+
+    async def send(self, peer, packet):
+        try:
+            peer = self._peers[peer]
+        except KeyError:
+            raise UnknownPeer(peer)
+        await peer.send(packet)
+
+    async def _handle(self, peer, packet):
+        print(peer.name, packet)
 
     def start(self):
         super().start()
@@ -52,45 +75,6 @@ class Member(Looper):
         self._gossiper.stop()
         for peer in self._peers.values():
             peer.stop()
-
-    async def _want_peer(self, peer):
-        if peer not in self.wanted:
-            self.wanted.append(peer)
-        while ...:
-            try:
-                return self._peers[peer]
-            except KeyError:
-                # TODO: handling a peer that never appears?
-                await self.sleep(0.5)
-
-    async def send(self, peer, event, data):
-        peer = await self._want_peer(peer)
-        packet = {
-            'event': ('snd', event),
-            'data': data,
-        }
-        s =  await peer.send(packet)
-
-    async def request(self, peer, endpoint, *args, **kwargs):
-        peer = await self._want_peer(peer)
-        pid = os.random(4)
-        self._requests
-        packet = {
-            'event': ('req', endpoint),
-            'data': {
-                'args': args,
-                'kwargs': kwargs
-            }
-        }
-
-    async def _handle(self, peer, event, data):
-        print(peer, event, data)
-
-    async def handle(self, event, callback):
-        pass
-
-    async def unhandle(self, event, callback, count=1):
-        pass
 
 
 class _Component(Looper):
@@ -165,6 +149,9 @@ class _Peer(_Component):
         self._ready.set()
 
     async def send(self, data):
+        # TODO: timeout?
+        if self.name not in self.member.wanted:
+            self.member.wanted.add(self.name)
         await self._ready.wait()
         packet = json.dumps(data).encode()
         return await self._socket.send(packet)
@@ -173,6 +160,7 @@ class _Peer(_Component):
         member = self.member
 
         while ...:
+            # TODO: Automatically handle connect here?
             await self._ready.wait()
             packet = await self._socket.recv(1024)
             if not packet:
@@ -184,13 +172,7 @@ class _Peer(_Component):
             except (UnicodeDecodeError, json.JSONDecodeError):
                 continue
 
-            try:
-                event = packet['event']
-                data = packet['data']
-            except KeyError:
-                continue
-
-            await member._handle(self.name, event, data)
+            await member._handle(self, packet)
 
     def close(self):
         if self._socket is not None:
