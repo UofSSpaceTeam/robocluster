@@ -15,17 +15,27 @@ async def amain(name, other, loop):
 
     member = Member(name, 12345)
     member.start()
-    member.subscribe(other, 'pub')
 
     def echo(*args, **kwargs):
+        print(args, kwargs)
         return args, kwargs
 
-    member.request_endpoint('thing', echo)
+    def echo_send(*args, **kwargs):
+        print('echo_send', args, kwargs)
+
+    def echo_sub(*args, **kwargs):
+        print('echo_sub', args, kwargs)
+
+    member.on_recv('send', echo_send)
+    member.subscribe(other, 'pub', echo_sub)
+    member.on_request('thing', echo)
+
     while ...:
         await member.sleep(1)
         with suppress(UnknownPeer):
             await member.send(other, 'send', time())
-            print(await member.request(other, 'thing', 1, 2, 3, a=1, b=2))
+            result = await member.request(other, 'thing', 1, 2, 3, a=1, b=2)
+            print('result:', result)
         await member.publish('pub', time())
 
 
@@ -58,6 +68,8 @@ class Member(Looper):
         self.wanted = set()
 
         self.subscriptions = set()
+
+        self._send_endpoints = {}
         self._request_endpoints = {}
 
         self._peers = {}
@@ -70,17 +82,30 @@ class Member(Looper):
         except KeyError:
             raise UnknownPeer(peer)
 
-    def subscribe(self, peer, endpoint):
-        self.subscriptions.add((peer, endpoint))
+    def on_recv(self, endpoint, callback):
+        self._send_endpoints[endpoint] = as_coroutine(callback)
+
+    def subscribe(self, peer, endpoint, callback):
+        endpoint = '{}/{}'.format(peer, endpoint)
+        self.on_recv(endpoint, callback)
+        self.subscriptions.add(endpoint)
 
     async def send(self, peer, endpoint, data):
         await self.try_peer(peer).send(endpoint, data)
 
     async def publish(self, endpoint, data):
+        endpoint = '{}/{}'.format(self.name, endpoint)
         for peer in self._peers.values():
             await peer.publish(endpoint, data)
 
-    def request_endpoint(self, endpoint, callback):
+    async def _handle_send(self, endpoint, data):
+        try:
+            endpoint = self._send_endpoints[endpoint]
+        except KeyError:
+            return
+        await endpoint(data)
+
+    def on_request(self, endpoint, callback):
         self._request_endpoints[endpoint] = as_coroutine(callback)
 
     async def request(self, peer, endpoint, *args, **kwargs):
@@ -91,7 +116,8 @@ class Member(Looper):
             endpoint = self._request_endpoints[endpoint]
         except KeyError:
             return 'no such endpoint'
-        return await endpoint(*args, **kwargs)
+        result = await endpoint(*args, **kwargs)
+        return result
 
     def start(self):
         super().start()
@@ -171,11 +197,12 @@ class _Peer(_Component):
         await self._send(packet)
 
     async def publish(self, endpoint, data):
-        if (self.member.name, endpoint) in self.subscriptions:
+        if endpoint in self.subscriptions:
             await self.send(endpoint, data)
 
     async def _handle_send(self, packet):
         endpoint, data = packet
+        await self.member._handle_send(endpoint, data)
 
     async def request(self, endpoint, *args, **kwargs):
         await self.connected
@@ -195,7 +222,6 @@ class _Peer(_Component):
         rid, result = packet
         future = self._pending.pop(rid, None)
         if future:
-            print(result)
             future.set_result(result)
 
     async def accept(self, conn):
@@ -236,6 +262,8 @@ class _Peer(_Component):
             if not size:
                 # Other side has been closed
                 self.close()
+                continue
+
             size = int.from_bytes(size, 'big')
             data = await self._socket.recv(size)
 
@@ -311,7 +339,7 @@ class _Gossiper(_Component):
             try:
                 name, uid, port, wanted, subscriptions = data
                 address = source[0], port
-                subscriptions = set(tuple(s) for s in subscriptions)
+                subscriptions = set(subscriptions)
                 wanted = set(wanted)
             except (TypeError, ValueError):
                 continue
