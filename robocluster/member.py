@@ -107,9 +107,12 @@ class _Peer(_Component):
         self.uid = uid
 
         self._address = None
-        self._wanted = []
+
+        self._wanted = set()
+        self._is_wanted = asyncio.Event(loop=self.loop)
+
         self._socket = None
-        self._ready = asyncio.Event(loop=self.loop)
+        self._connected = asyncio.Event(loop=self.loop)
 
         self.add_daemon_task(self._recv_loop)
 
@@ -123,45 +126,42 @@ class _Peer(_Component):
             self.close()
             self._address = new
 
-    async def connect(self):
-        member = self.member
-
-        if self._socket is not None:
-            return self._socket
-
-        if member.uid >= self.uid:
-            raise RuntimeError('Should not be connecting to lesser id')
-
-        sock = self._socket = self.socket('tcp')
-
-        try:
-            await sock.connect(self._address)
-        except ConnectionRefusedError:
-            return
-
-        await sock.send(member.name.encode())
-        self._ready.set()
+    async def send(self, data):
+        # TODO: timeout?
+        self.member.wanted.add(self.name)
+        await self._connected.wait()
+        packet = json.dumps(data).encode()
+        return await self._socket.send(packet)
 
     async def accept(self, conn):
         if self._socket is not None:
             conn.close()
         self._socket = conn
-        self._ready.set()
-
-    async def send(self, data):
-        # TODO: timeout?
-        if self.name not in self.member.wanted:
-            self.member.wanted.add(self.name)
-        await self._ready.wait()
-        packet = json.dumps(data).encode()
-        return await self._socket.send(packet)
+        self._connected.set()
 
     async def _recv_loop(self):
         member = self.member
 
         while ...:
-            # TODO: Automatically handle connect here?
-            await self._ready.wait()
+            await self._is_wanted.wait()
+
+            if member.uid >= self.uid:
+                # The other side will connect to me
+                await self._connected.wait()
+            elif not self._connected.is_set():
+                # I am responsible for doing the connect!
+                self._socket = self.socket('tcp')
+
+                try:
+                    await self._socket.connect(self._address)
+                except (ConnectionRefusedError, OSError):
+                    self.close()
+                    await self.sleep(1)  # TODO: change delay?
+                    continue
+
+                await self._socket.send(member.name.encode())
+                self._connected.set()
+
             packet = await self._socket.recv(1024)
             if not packet:
                 self.close()
@@ -176,9 +176,22 @@ class _Peer(_Component):
 
     def close(self):
         if self._socket is not None:
-            self._ready.clear()
+            self._connected.clear()
             self._socket.close()
             self._socket = None
+
+    @property
+    def wanted(self):
+        return self._wanted
+
+    @wanted.setter
+    def wanted(self, names):
+        member = self.member
+        self._wanted = names
+        if self.name in member.wanted or member.name in self._wanted:
+            self._is_wanted.set()
+        else:
+            self._is_wanted.clear()
 
 
 class _Gossiper(_Component):
@@ -254,7 +267,6 @@ class _Connector(_Component):
         self._socket = self.socket('tcp', bind=('', 0))
         self._socket.listen()
 
-        self.add_daemon_task(self._conncect_loop)
         self.add_daemon_task(self._listen_loop)
 
     @property
@@ -275,15 +287,6 @@ class _Connector(_Component):
                 continue
 
             await peer.accept(conn)
-
-    async def _conncect_loop(self):
-        member = self.member
-        while ...:
-            for name, peer in member._peers.items():
-                if member.name in peer.wanted or name in member.wanted:
-                    if member.uid < peer.uid:
-                        await peer.connect()
-            await self.sleep(1)
 
 
 if __name__ == '__main__':
