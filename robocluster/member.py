@@ -103,6 +103,7 @@ class _Component(Looper):
 class _Peer(_Component):
     def __init__(self, member, name, uid):
         super().__init__(member)
+
         self.name = name
         self.uid = uid
 
@@ -113,6 +114,8 @@ class _Peer(_Component):
 
         self._socket = None
         self._connected = asyncio.Event(loop=self.loop)
+
+        self.buffer_size = 4096
 
         self.add_daemon_task(self._recv_loop)
 
@@ -130,8 +133,7 @@ class _Peer(_Component):
         # TODO: timeout?
         self.member.wanted.add(self.name)
         await self._connected.wait()
-        packet = json.dumps(data).encode()
-        return await self._socket.send(packet)
+        return await self._socket.send(data)
 
     async def accept(self, conn):
         if self._socket is not None:
@@ -162,17 +164,13 @@ class _Peer(_Component):
                 await self._socket.send(member.name.encode())
                 self._connected.set()
 
-            packet = await self._socket.recv(1024)
-            if not packet:
+            data = await self._socket.recv(self.buffer_size)
+            if not data:
+                # Other side has been closed
                 self.close()
                 continue
 
-            try:
-                packet = json.loads(packet.decode())
-            except (UnicodeDecodeError, json.JSONDecodeError):
-                continue
-
-            await member._handle(self, packet)
+            await member._handle(self, data)
 
     def close(self):
         if self._socket is not None:
