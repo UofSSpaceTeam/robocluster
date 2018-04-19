@@ -6,6 +6,7 @@ import os
 
 from robocluster.net import AsyncSocket
 from robocluster.loop import Looper
+from util import as_coroutine
 
 
 async def amain(name, other, loop):
@@ -15,7 +16,11 @@ async def amain(name, other, loop):
     member = Member(name, 12345)
     member.start()
     member.subscribe(other, 'pub')
-    print(member.subscriptions)
+
+    def echo(*args, **kwargs):
+        return args, kwargs
+
+    member.request_endpoint('thing', echo)
     while ...:
         await member.sleep(1)
         with suppress(UnknownPeer):
@@ -53,6 +58,7 @@ class Member(Looper):
         self.wanted = set()
 
         self.subscriptions = set()
+        self._request_endpoints = {}
 
         self._peers = {}
         self._accepter = _Accepter(self)
@@ -74,8 +80,18 @@ class Member(Looper):
         for peer in self._peers.values():
             await peer.publish(endpoint, data)
 
+    def request_endpoint(self, endpoint, callback):
+        self._request_endpoints[endpoint] = as_coroutine(callback)
+
     async def request(self, peer, endpoint, *args, **kwargs):
         return await self.try_peer(peer).request(endpoint, *args, **kwargs)
+
+    async def _handle_request(self, endpoint, *args, **kwargs):
+        try:
+            endpoint = self._request_endpoints[endpoint]
+        except KeyError:
+            return 'no such endpoint'
+        return await endpoint(*args, **kwargs)
 
     def start(self):
         super().start()
@@ -171,10 +187,7 @@ class _Peer(_Component):
 
     async def _handle_request(self, packet):
         rid, endpoint, args, kwargs = packet
-
-        # TODO: actually handle request
-        result = args, kwargs
-
+        result = await self.member._handle_request(endpoint, *args, **kwargs)
         packet = 'response', (rid, result)
         await self._send(packet)
 
