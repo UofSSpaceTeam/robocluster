@@ -35,7 +35,7 @@ class Member(Looper):
         super().__init__(loop)
         self.name = name
         self.uid = int.from_bytes(os.urandom(4), 'big')
-        self.wanted = []
+        self.wanted = set()
 
         self._peers = {}
         self._connector = _Connector(self)
@@ -231,7 +231,7 @@ class _Gossiper(_Component):
             try:
                 name = data['name']
                 uid = data['uid']
-                wanted = data['wanted']
+                wanted = set(data['wanted'])
                 address = source[0], data['port']
             except KeyError:
                 continue
@@ -256,7 +256,7 @@ class _Gossiper(_Component):
                 'uid': member.uid,
                 'name': member.name,
                 'port': member._connector.port,
-                'wanted': member.wanted,
+                'wanted': list(member.wanted),
             }
             packet = json.dumps(data).encode()
             try:
@@ -302,6 +302,7 @@ class _Connector(_Component):
                     if member.uid < peer.uid:
                         await peer.connect()
             await self.sleep(1)
+
 
 if __name__ == '__main__':
     exit(main())
