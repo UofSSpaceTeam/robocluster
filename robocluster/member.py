@@ -17,9 +17,7 @@ async def amain(name, other, loop):
     while ...:
         await member.sleep(1)
         with suppress(UnknownPeer):
-            await member.send(other, {
-                "hello": time()
-            })
+            await member.send(other, b'hello world!')
 
 
 def main():
@@ -201,7 +199,6 @@ class _Gossiper(_Component):
         if key is None:
             # create key from port
             self._key = (port*port).to_bytes(4, 'big')
-            print(self._key)
         else:
             self._key = key
 
