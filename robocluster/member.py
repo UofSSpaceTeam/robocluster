@@ -51,7 +51,7 @@ class Member(Looper):
         self.wanted = set()
 
         self._peers = {}
-        self._connector = _Connector(self)
+        self._accepter = _Accepter(self)
         self._gossiper = _Gossiper(self, gossip_port, gossip_key)
 
     async def send(self, peer, packet):
@@ -66,12 +66,12 @@ class Member(Looper):
 
     def start(self):
         super().start()
-        self._connector.start()
+        self._accepter.start()
         self._gossiper.start()
 
     def stop(self):
         super().stop()
-        self._connector.stop()
+        self._accepter.stop()
         self._gossiper.stop()
         for peer in self._peers.values():
             peer.stop()
@@ -250,7 +250,7 @@ class _Gossiper(_Component):
             data = {
                 'uid': member.uid,
                 'name': member.name,
-                'port': member._connector.port,
+                'port': member._accepter.port,
                 'wanted': list(member.wanted),
             }
             packet = json.dumps(data).encode()
@@ -261,19 +261,19 @@ class _Gossiper(_Component):
             await self.sleep(1)
 
 
-class _Connector(_Component):
+class _Accepter(_Component):
     def __init__(self, member):
         super().__init__(member)
         self._socket = self.socket('tcp', bind=('', 0))
         self._socket.listen()
 
-        self.add_daemon_task(self._listen_loop)
+        self.add_daemon_task(self._accept_loop)
 
     @property
     def port(self):
         return self._socket.getsockname()[1]
 
-    async def _listen_loop(self):
+    async def _accept_loop(self):
         member = self.member
         while ...:
             conn, address = await self._socket.accept()
