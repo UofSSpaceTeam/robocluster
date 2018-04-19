@@ -25,7 +25,7 @@ def as_coroutine(func):
     """
     @wraps(func)
     async def _wrapper(*args, **kwargs):
-        func(*args, *kwargs)
+        return func(*args, *kwargs)
 
     if iscoroutinefunction(func):
         return func
