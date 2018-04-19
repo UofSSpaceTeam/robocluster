@@ -12,7 +12,7 @@ async def amain(name, other, loop):
     from contextlib import suppress
     from time import time
 
-    member = Member(name, b'deafbeef', 12345)
+    member = Member(name, 12345)
     member.start()
     while ...:
         await member.sleep(1)
@@ -44,7 +44,7 @@ class UnknownPeer(Error):
 
 
 class Member(Looper):
-    def __init__(self, name, gossip_key, gossip_port, loop=None):
+    def __init__(self, name, port, key=None, loop=None):
         super().__init__(loop)
         self.name = name
         self.uid = int.from_bytes(os.urandom(4), 'big')
@@ -52,7 +52,7 @@ class Member(Looper):
 
         self._peers = {}
         self._accepter = _Accepter(self)
-        self._gossiper = _Gossiper(self, gossip_port, gossip_key)
+        self._gossiper = _Gossiper(self, port, key=key)
 
     async def send(self, peer, packet):
         try:
@@ -195,13 +195,20 @@ class _Peer(_Component):
 
 
 class _Gossiper(_Component):
-    def __init__(self, member, port, key):
+    def __init__(self, member, port, key=None):
         super().__init__(member)
-        self._socket = self.socket('udp', bind=('', port))
-        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
-        self._key = key
         self._port = port
+
+        if key is None:
+            # create key from port
+            self._key = (port*port).to_bytes(4, 'big')
+            print(self._key)
+        else:
+            self._key = key
+
+        self._socket = self.socket('udp', bind=('', self._port))
+        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
         self.add_daemon_task(self._recv_loop)
         self.add_daemon_task(self._send_loop)
