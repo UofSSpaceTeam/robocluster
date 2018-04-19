@@ -14,10 +14,14 @@ async def amain(name, other, loop):
 
     member = Member(name, 12345)
     member.start()
+    member.subscribe(other, 'pub')
+    print(member.subscriptions)
     while ...:
         await member.sleep(1)
         with suppress(UnknownPeer):
-            await member.send(other, b'hello world!')
+            await member.send(other, 'send', time())
+            print(await member.request(other, 'thing', 1, 2, 3, a=1, b=2))
+        await member.publish('pub', time())
 
 
 def main():
@@ -48,19 +52,30 @@ class Member(Looper):
         self.uid = int.from_bytes(os.urandom(4), 'big')
         self.wanted = set()
 
+        self.subscriptions = set()
+
         self._peers = {}
         self._accepter = _Accepter(self)
         self._gossiper = _Gossiper(self, port, key=key)
 
-    async def send(self, peer, packet):
+    def try_peer(self, peer):
         try:
-            peer = self._peers[peer]
+            return self._peers[peer]
         except KeyError:
             raise UnknownPeer(peer)
-        await peer.send(packet)
 
-    async def _handle(self, peer, packet):
-        print(peer.name, packet)
+    def subscribe(self, peer, endpoint):
+        self.subscriptions.add((peer, endpoint))
+
+    async def send(self, peer, endpoint, data):
+        await self.try_peer(peer).send(endpoint, data)
+
+    async def publish(self, endpoint, data):
+        for peer in self._peers.values():
+            await peer.publish(endpoint, data)
+
+    async def request(self, peer, endpoint, *args, **kwargs):
+        return await self.try_peer(peer).request(endpoint, *args, **kwargs)
 
     def start(self):
         super().start()
@@ -106,14 +121,15 @@ class _Peer(_Component):
         self.uid = uid
 
         self._address = None
+        self.subscriptions = set()
 
         self._wanted = set()
         self._is_wanted = asyncio.Event(loop=self.loop)
 
+        self._pending = {}
+
         self._socket = None
         self._connected = asyncio.Event(loop=self.loop)
-
-        self.buffer_size = 4096
 
         self.add_daemon_task(self._recv_loop)
 
@@ -127,17 +143,58 @@ class _Peer(_Component):
             self.close()
             self._address = new
 
-    async def send(self, data):
-        # TODO: timeout?
+    @property
+    def connected(self):
         self.member.wanted.add(self.name)
-        await self._connected.wait()
-        return await self._socket.send(data)
+        return self._connected.wait()
+
+    async def send(self, endpoint, data):
+        # TODO: timeout?
+        await self.connected
+        packet = 'send', (endpoint, data)
+        await self._send(packet)
+
+    async def publish(self, endpoint, data):
+        if (self.member.name, endpoint) in self.subscriptions:
+            await self.send(endpoint, data)
+
+    async def _handle_send(self, packet):
+        endpoint, data = packet
+
+    async def request(self, endpoint, *args, **kwargs):
+        await self.connected
+        rid = int.from_bytes(os.urandom(4), 'big')
+        packet = 'request', (rid, endpoint, args, kwargs)
+        future = self._pending[rid] = asyncio.Future(loop=self.loop)
+        await self._send(packet)
+        return await future
+
+    async def _handle_request(self, packet):
+        rid, endpoint, args, kwargs = packet
+
+        # TODO: actually handle request
+        result = args, kwargs
+
+        packet = 'response', (rid, result)
+        await self._send(packet)
+
+    async def _handle_response(self, packet):
+        rid, result = packet
+        future = self._pending.pop(rid, None)
+        if future:
+            print(result)
+            future.set_result(result)
 
     async def accept(self, conn):
         if self._socket is not None:
             conn.close()
         self._socket = conn
         self._connected.set()
+
+    async def _send(self, packet):
+        packet = json.dumps(packet).encode()
+        size = len(packet).to_bytes(4, 'big')
+        await self._socket.send(size + packet)
 
     async def _recv_loop(self):
         member = self.member
@@ -159,16 +216,29 @@ class _Peer(_Component):
                     await self.sleep(1)  # TODO: change delay?
                     continue
 
-                await self._socket.send(member.name.encode())
+                await self._send(member.name)
                 self._connected.set()
 
-            data = await self._socket.recv(self.buffer_size)
-            if not data:
+            size = await self._socket.recv(4)
+            if not size:
                 # Other side has been closed
                 self.close()
+            size = int.from_bytes(size, 'big')
+            data = await self._socket.recv(size)
+
+            try:
+                data = json.loads(data.decode())
+            except (UnicodeDecodeError, json.JSONDecodeError):
                 continue
 
-            await member._handle(self, data)
+            try:
+                kind, packet = data
+            except ValueError:
+                continue
+
+            handler = getattr(self, '_handle_' + kind, None)
+            if handler:
+                await handler(packet)
 
     def close(self):
         if self._socket is not None:
@@ -226,11 +296,11 @@ class _Gossiper(_Component):
                 continue
 
             try:
-                name = data['name']
-                uid = data['uid']
-                wanted = set(data['wanted'])
-                address = source[0], data['port']
-            except KeyError:
+                name, uid, port, wanted, subscriptions = data
+                address = source[0], port
+                subscriptions = set(tuple(s) for s in subscriptions)
+                wanted = set(wanted)
+            except (TypeError, ValueError):
                 continue
 
             if uid == member.uid:
@@ -242,6 +312,7 @@ class _Gossiper(_Component):
                 peer = member._peers[name] = _Peer(member, name, uid)
 
             peer.address = address
+            peer.subscriptions = subscriptions
             peer.wanted = wanted
             peer.start()
 
@@ -249,12 +320,13 @@ class _Gossiper(_Component):
         member = self.member
         address = '255.255.255.255', self._port
         while ...:
-            data = {
-                'uid': member.uid,
-                'name': member.name,
-                'port': member._accepter.port,
-                'wanted': list(member.wanted),
-            }
+            data = (
+                member.name,
+                member.uid,
+                member._accepter.port,
+                tuple(member.wanted),
+                tuple(member.subscriptions),
+            )
             packet = json.dumps(data).encode()
             try:
                 await self._socket.sendto(self._key + packet, address)
@@ -279,12 +351,14 @@ class _Accepter(_Component):
         member = self.member
         while ...:
             conn, address = await self._socket.accept()
-            name = await conn.recv(1024)
+            size = await conn.recv(4)
+            size = int.from_bytes(size, 'big')
+            name = await conn.recv(size)
 
             try:
-                name = name.decode()
+                name = json.loads(name.decode())
                 peer = member._peers[name]
-            except (UnicodeDecodeError, KeyError):
+            except (UnicodeDecodeError, KeyError, json.JSONDecodeError):
                 conn.close()
                 continue
 
