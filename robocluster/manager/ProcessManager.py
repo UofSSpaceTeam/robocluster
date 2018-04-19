@@ -131,13 +131,27 @@ class ProcessManager:
             print('got remote createProcess')
             name = data['name']
             command = data['command']
-            self.createProcess(name, command)
+            if data['type']:
+                try:
+                    proc = globals()[data['type']](name, command)  # gross?
+                    self.addProcess(proc)
+                except AttributeError:
+                    print('ERROR: Invalid process type')
+                    return
+            else:
+                print('Creating default process type')
+                self.createProcess(name, command)
             self.start(name)
 
         @self.remote_api_device.on('*/stop')
         async def remote_stop(event, data):
             print('Got remote stop')
-            self.stop()
+            self.stop(data)
+
+        @self.remote_api_device.on('*/start')
+        async def remote_start(event, data):
+            print('Starting: {}'.format(data))
+            self.start(data)
 
         @self.remote_api_device.task
         async def rem_print_started():
