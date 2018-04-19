@@ -46,6 +46,13 @@ class Member(Looper):
         self._connector.start()
         self._gossiper.start()
 
+    def stop(self):
+        super().stop()
+        self._connector.stop()
+        self._gossiper.stop()
+        for peer in self._peers.values():
+            peer.stop()
+
     async def _want_peer(self, peer):
         if peer not in self.wanted:
             self.wanted.append(peer)
