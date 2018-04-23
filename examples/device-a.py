@@ -12,9 +12,5 @@ def hello(event, data):
 def every(event, data):
     print(event, data)
 
-@device.every('1s')
-def beat():
-    print(device._member._peers)
-
 device.start()
 device.context.wait()

@@ -1,4 +1,3 @@
-import asyncio
 from time import time
 
 from robocluster import Device
@@ -16,9 +15,9 @@ async def hello():
 
 @device.every('100ms')
 async def every():
-    t = time()
-    await device.publish('every', t)
-    print('publish:', t)
+    now = time()
+    await device.publish('every', now)
+    print('publish:', now)
 
 device.start()
 device.context.wait()
