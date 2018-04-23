@@ -4,52 +4,9 @@ import struct
 import json
 import os
 
-from robocluster.net import AsyncSocket
-from robocluster.loop import Looper
-from util import as_coroutine
-
-
-async def amain(name, other, loop):
-    from contextlib import suppress
-    from time import time
-
-    member = Member(name, 12345)
-    member.start()
-
-    def echo(*args, **kwargs):
-        print(args, kwargs)
-        return args, kwargs
-
-    def echo_send(*args, **kwargs):
-        print('echo_send', args, kwargs)
-
-    def echo_sub(*args, **kwargs):
-        print('echo_sub', args, kwargs)
-
-    member.on_recv('send', echo_send)
-    member.subscribe(other, 'pub', echo_sub)
-    member.on_request('thing', echo)
-
-    while ...:
-        await member.sleep(1)
-        with suppress(UnknownPeer):
-            await member.send(other, 'send', time())
-            result = await member.request(other, 'thing', 1, 2, 3, a=1, b=2)
-            print('result:', result)
-        await member.publish('pub', time())
-
-
-def main():
-    import asyncio
-    import sys
-    from loop import LoopThread
-    loop = LoopThread()
-    loop.start()
-    loop.create_task(amain(sys.argv[1], sys.argv[2], loop.loop))
-    try:
-        loop.join()
-    except KeyboardInterrupt:
-        loop.stop()
+from .net import AsyncSocket
+from .loop import Looper
+from .util import as_coroutine
 
 
 class Error(Exception):
@@ -100,10 +57,10 @@ class Member(Looper):
 
     async def _handle_send(self, endpoint, data):
         try:
-            endpoint = self._send_endpoints[endpoint]
+            callback = self._send_endpoints[endpoint]
         except KeyError:
             return
-        await endpoint(data)
+        await callback(endpoint, data)
 
     def on_request(self, endpoint, callback):
         self._request_endpoints[endpoint] = as_coroutine(callback)
@@ -113,10 +70,10 @@ class Member(Looper):
 
     async def _handle_request(self, endpoint, *args, **kwargs):
         try:
-            endpoint = self._request_endpoints[endpoint]
+            callback = self._request_endpoints[endpoint]
         except KeyError:
             return 'no such endpoint'
-        result = await endpoint(*args, **kwargs)
+        result = await callback(*args, **kwargs)
         return result
 
     def start(self):
