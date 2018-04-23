@@ -113,6 +113,8 @@ class _Component(Looper):
 
 
 class _Peer(_Component):
+    CONNECTION_RETRY_RATE = 0.1
+
     def __init__(self, member, name, uid):
         super().__init__(member)
 
@@ -209,7 +211,7 @@ class _Peer(_Component):
                     await self._socket.connect(self._address)
                 except (ConnectionRefusedError, OSError):
                     self.close()
-                    await self.sleep(1)  # TODO: change delay?
+                    await self.sleep(self.CONNECTION_RETRY_RATE)
                     continue
 
                 await self._send(member.name)
@@ -259,6 +261,8 @@ class _Peer(_Component):
 
 
 class _Gossiper(_Component):
+    GOSSIP_RATE = 0.1
+
     def __init__(self, member, port, key=None):
         super().__init__(member)
 
@@ -330,7 +334,7 @@ class _Gossiper(_Component):
                 await self._socket.sendto(self._key + packet, address)
             except OSError as e:
                 print(e)
-            await self.sleep(1)
+            await self.sleep(self.GOSSIP_RATE)
 
 
 class _Accepter(_Component):
