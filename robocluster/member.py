@@ -5,7 +5,7 @@ import json
 import os
 
 from .net import AsyncSocket
-from .loop import Looper
+from .looper import Looper
 from .util import as_coroutine
 
 

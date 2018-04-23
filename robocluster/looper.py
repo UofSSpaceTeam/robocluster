@@ -46,17 +46,9 @@ class LoopThread(Thread):
         if loop is self.loop:
             return loop.create_task(coro)
 
-        if not self.loop.is_running():
-            msg = 'Event loop must be running to create from different thread.'
-            raise RuntimeError(msg)
-
-        future = Future()
         def _create_task():
             task = self.loop.create_task(coro)
-            future.set_result(task)
         self.loop.call_soon_threadsafe(_create_task)
-        # blocks until task has been created by the loop
-        return future.result()
 
     def cancel_task(self, task):
         """Cancel a task in the event loop."""

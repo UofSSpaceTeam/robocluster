@@ -1,12 +1,15 @@
 """Message passing for robocluster."""
 
 import asyncio
+import hashlib
 from collections import defaultdict
 from contextlib import suppress
 from fnmatch import fnmatch
 from functools import wraps
 from threading import Thread
 
+from .looper import Looper
+from .member import Member
 from .util import duration_to_seconds, as_coroutine
 
 class AttributeDict(dict):
