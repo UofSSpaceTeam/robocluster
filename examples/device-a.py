@@ -1,3 +1,5 @@
+import asyncio
+
 from robocluster import Device
 
 device = Device('device-a', 'demo-device')
@@ -10,4 +12,9 @@ def hello(event, data):
 def every(event, data):
     print(event, data)
 
-device.run()
+@device.every('1s')
+def beat():
+    print(device._member._peers)
+
+device.start()
+device.context.wait()

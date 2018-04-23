@@ -28,11 +28,6 @@ async def hello_b():
 async def every_b():
     await device_b.publish('every', time())
 
-try:
-    device_a.start()
-    device_b.start()
-    device_a.wait()
-    device_b.wait()
-except KeyboardInterrupt:
-    device_a.stop()
-    device_b.stop()
+device_a.start()
+device_b.start()
+device_a.context.wait()
