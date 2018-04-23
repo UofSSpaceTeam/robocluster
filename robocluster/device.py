@@ -39,7 +39,7 @@ def group_to_port(group):
 class Device(Looper):
     """A device to interact with the robocluster network."""
 
-    def __init__(self, name, group, context=None):
+    def __init__(self, name, group, network=None, context=None):
         """
         Initialize the device.
 
@@ -48,6 +48,7 @@ class Device(Looper):
             group (str): Used to select the multicast address.
                 In order for devices to talk to each other,
                 they must be in the same group.
+            network (str): IPv4 network to broadcast on (default 0.0.0.0/0)
             loop (asyncio.AbstractEventLoop, optional): Event loop to use.
                 Defaults to the current event loop.
         """
@@ -55,8 +56,10 @@ class Device(Looper):
         self.context._ready.wait()
         super().__init__(self.context.loop)
 
+        if network is None:
+            network = '0.0.0.0/0'
         port = group_to_port(group)
-        self._member = Member(name, port, loop=self.loop)
+        self._member = Member(name, network, port, loop=self.loop)
 
         self._storage = AttributeDict()
 

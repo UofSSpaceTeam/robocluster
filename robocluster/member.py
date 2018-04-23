@@ -4,6 +4,7 @@ import struct
 import json
 import os
 from fnmatch import fnmatch
+from ipaddress import IPv4Network
 
 from .net import AsyncSocket
 from .looper import Looper
@@ -19,7 +20,7 @@ class UnknownPeer(Error):
 
 
 class Member(Looper):
-    def __init__(self, name, port, key=None, loop=None):
+    def __init__(self, name, network, port, key=None, loop=None):
         super().__init__(loop)
         self.name = name
         self.uid = int.from_bytes(os.urandom(4), 'big')
@@ -32,7 +33,7 @@ class Member(Looper):
 
         self._peers = {}
         self._accepter = _Accepter(self)
-        self._gossiper = _Gossiper(self, port, key=key)
+        self._gossiper = _Gossiper(self, network, port, key=key)
 
     def try_peer(self, peer):
         try:
@@ -263,10 +264,11 @@ class _Peer(_Component):
 class _Gossiper(_Component):
     GOSSIP_RATE = 0.1
 
-    def __init__(self, member, port, key=None):
+    def __init__(self, member, network, port, key=None):
         super().__init__(member)
 
-        self._port = port
+        network = IPv4Network(network, strict=False)
+        self._address = str(network.broadcast_address), port
 
         if key is None:
             # create key from port
@@ -274,7 +276,7 @@ class _Gossiper(_Component):
         else:
             self._key = key
 
-        self._socket = self.socket('udp', bind=('', self._port))
+        self._socket = self.socket('udp', bind=('', self._address[1]))
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
         self.add_daemon_task(self._recv_loop)
@@ -320,7 +322,6 @@ class _Gossiper(_Component):
 
     async def _send_loop(self):
         member = self.member
-        address = '255.255.255.255', self._port
         while ...:
             data = (
                 member.name,
@@ -329,9 +330,9 @@ class _Gossiper(_Component):
                 tuple(member.wanted),
                 tuple(member.subscriptions),
             )
-            packet = json.dumps(data).encode()
+            packet = self._key + json.dumps(data).encode()
             try:
-                await self._socket.sendto(self._key + packet, address)
+                await self._socket.sendto(packet, self._address)
             except OSError as e:
                 print(e)
             await self.sleep(self.GOSSIP_RATE)
