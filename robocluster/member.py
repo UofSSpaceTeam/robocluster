@@ -3,6 +3,7 @@ import socket
 import struct
 import json
 import os
+from fnmatch import fnmatch
 
 from .net import AsyncSocket
 from .looper import Looper
@@ -56,11 +57,9 @@ class Member(Looper):
             await peer.publish(endpoint, data)
 
     async def _handle_send(self, endpoint, data):
-        try:
-            callback = self._send_endpoints[endpoint]
-        except KeyError:
-            return
-        await callback(endpoint, data)
+        for end, callback in self._send_endpoints.items():
+            if fnmatch(endpoint, end):
+                await callback(endpoint, data)
 
     def on_request(self, endpoint, callback):
         self._request_endpoints[endpoint] = as_coroutine(callback)
@@ -91,8 +90,8 @@ class Member(Looper):
 
 class _Component(Looper):
     def __init__(self, member):
-        super().__init__(member.loop)
         self.member = member
+        super().__init__(self.member.loop)
 
     def socket(self, kind, bind=None):
         try:
@@ -156,8 +155,9 @@ class _Peer(_Component):
         await self._send(packet)
 
     async def publish(self, endpoint, data):
-        if endpoint in self.subscriptions:
-            await self.send(endpoint, data)
+        for subscription in self.subscriptions:
+            if fnmatch(endpoint, subscription):
+                await self.send(endpoint, data)
 
     async def _handle_send(self, packet):
         endpoint, data = packet
