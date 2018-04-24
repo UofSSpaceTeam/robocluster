@@ -221,6 +221,9 @@ class Device(Looper):
         self._member.stop()
         super().stop()
 
+    def wait(self):
+        """Wait for device context to exit."""
+        self.context.wait()
 
 class Context(threading.Thread):
     __DEFAULT = None
