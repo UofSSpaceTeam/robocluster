@@ -57,10 +57,13 @@ class Member(Looper):
         for peer in self._peers.values():
             await peer.publish(endpoint, data)
 
-    async def _handle_send(self, endpoint, data):
+    async def _handle_send(self, source, endpoint, data):
         for end, callback in self._send_endpoints.items():
             if fnmatch(endpoint, end):
-                await callback(endpoint, data)
+                if endpoint in self.subscriptions:
+                    await callback(endpoint, data)
+                else:
+                    await callback(source, data)
 
     def on_request(self, endpoint, callback):
         self._request_endpoints[endpoint] = as_coroutine(callback)
@@ -162,7 +165,7 @@ class _Peer(_Component):
 
     async def _handle_send(self, packet):
         endpoint, data = packet
-        await self.member._handle_send(endpoint, data)
+        await self.member._handle_send(self.name, endpoint, data)
 
     async def request(self, endpoint, *args, **kwargs):
         await self.connected
