@@ -1,9 +1,18 @@
 """Utility functions for robocluster."""
 
 import re
+import socket
+import ipaddress
 from functools import wraps
 from inspect import iscoroutinefunction
 
+def ip_info(addr):
+    """Verify and detecet ip address family."""
+    addr = ipaddress.ip_address(addr)
+    if isinstance(addr, ipaddress.IPv6Address):
+        return socket.AF_INET6, addr
+    else:
+        return socket.AF_INET, addr
 
 def as_coroutine(func):
     """
@@ -15,7 +24,7 @@ def as_coroutine(func):
     """
     @wraps(func)
     async def _wrapper(*args, **kwargs):
-        func(*args, *kwargs)
+        return func(*args, **kwargs)
 
     if iscoroutinefunction(func):
         return func

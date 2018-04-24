@@ -28,14 +28,8 @@ setup(name='robocluster',
       author_email='software@usst.ca',
       license='ECL-2.0',
       packages=['robocluster'],
-      install_requires=[
-          'pyserial',
-          'pyserial-asyncio',
-          'pyvesc'
-      ],
-      dependency_links=[
-          'git+https://github.com/UofSSpaceTeam/PyVESC.git#egg=PyVESC'
-      ],
+      install_requires=[],
+      dependency_links=[],
       zip_safe=False,
       tests_require=['pytest', 'coverage', 'pytest-cov'],
       cmdclass={'test': PyTest},
