@@ -153,7 +153,7 @@ class Device(Looper):
         Return:
             The return value of the endpoint that you requested.
         """
-        return await self._member.request(dest, topic, *args, **kwargs)
+        return await self._member.request(dest, endpoint, *args, **kwargs)
 
     def on_request(self, endpoint, callback=None):
         """Add a callback for a request."""
