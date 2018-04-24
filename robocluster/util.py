@@ -3,7 +3,6 @@
 import re
 import socket
 import ipaddress
-import struct
 from functools import wraps
 from inspect import iscoroutinefunction
 

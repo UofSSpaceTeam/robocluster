@@ -4,7 +4,6 @@ import os
 import socket as socket_m
 import struct
 from functools import partial, wraps
-from contextlib import suppress
 
 
 __all__ = [

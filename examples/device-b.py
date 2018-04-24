@@ -20,4 +20,4 @@ async def every():
     print('publish:', now)
 
 device.start()
-device.context.wait()
+device.wait()

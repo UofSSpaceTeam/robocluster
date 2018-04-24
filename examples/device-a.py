@@ -1,5 +1,3 @@
-import asyncio
-
 from robocluster import Device
 
 device = Device('device-a', 'demo-device')
@@ -13,4 +11,4 @@ def every(event, data):
     print(event, data)
 
 device.start()
-device.context.wait()
+device.wait()

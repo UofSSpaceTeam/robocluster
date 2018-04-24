@@ -1,6 +1,5 @@
 import asyncio
 import socket
-import struct
 import json
 import os
 from fnmatch import fnmatch
@@ -356,7 +355,7 @@ class _Accepter(_Component):
     async def _accept_loop(self):
         member = self.member
         while ...:
-            conn, address = await self._socket.accept()
+            conn, _ = await self._socket.accept()
             size = await conn.recv(4)
             size = int.from_bytes(size, 'big')
             name = await conn.recv(size)

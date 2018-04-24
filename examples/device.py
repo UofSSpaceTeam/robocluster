@@ -35,4 +35,4 @@ async def every_b():
 
 device_a.start()
 device_b.start()
-device_a.context.wait()
+device_a.wait()

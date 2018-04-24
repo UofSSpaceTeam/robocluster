@@ -65,7 +65,7 @@ class Looper:
                 await coro(*args, **kwargs)
             except asyncio.CancelledError:
                 raise
-            except:
+            except:  # pylint: disable=W0702
                 import traceback
                 traceback.print_exc()
                 break
