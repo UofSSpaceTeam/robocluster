@@ -139,7 +139,7 @@ class ProcessManager:
             print('Got remote stop')
             self.stop()
 
-        @self.remote_api_device.task
+        # @self.remote_api_device.task
         async def rem_print_started():
             print('remote api running')
 
