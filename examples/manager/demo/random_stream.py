@@ -9,4 +9,5 @@ async def generate():
     '''Generate the numbers'''
     await device.publish('random', random.random())
 
-device.run()
+device.start()
+device.wait()

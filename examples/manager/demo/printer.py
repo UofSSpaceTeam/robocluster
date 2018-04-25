@@ -8,4 +8,5 @@ async def callback(event, data):
     '''Print the numbers'''
     print('Got ' + str(data))
 
-device.run()
+device.start()
+device.wait()
