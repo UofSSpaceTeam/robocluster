@@ -1,8 +1,11 @@
 from uuid import uuid4
 import random
 from time import sleep, time
+from contextlib import suppress
 
 from robocluster import Device
+from robocluster.member import UnknownPeer
+
 
 def test_pubsub():
     # random group so we don't collide in testing
@@ -17,21 +20,21 @@ def test_pubsub():
     @device_b.task
     async def publish():  # pylint: disable=W0612
         await device_b.publish(test_key, test_val)
+        await device_b.sleep(0.1) # do not hog
 
     @device_a.on('device-b/{}'.format(test_key))
     async def callback(event, data):  # pylint: disable=W0612
         nonlocal recieved_message
-        assert(event == 'device-b/{}'.format(test_key))
-        assert(data == test_val)
+        assert event == 'device-b/{}'.format(test_key)
+        assert data == test_val
         recieved_message = True
-        print(recieved_message)
 
     device_a.start()
     device_b.start()
-    sleep(0.01)
+    sleep(0.5)
     device_a.stop()
     device_b.stop()
-    assert(recieved_message)
+    assert recieved_message
 
 def test_every():
     # random group so we don't collide in testing
@@ -57,9 +60,9 @@ def test_every():
     device_a.start()
     sleep(0.04)
     device_a.stop()
-    assert(counter == 2)
+    assert counter == 2
     tolerance = 0.01
-    assert(loop_delay - 0.01 < tolerance)
+    assert loop_delay - 0.01 < tolerance
 
 def test_send():
     group = str(uuid4())
@@ -69,27 +72,26 @@ def test_send():
 
     TEST_DATA = {'key': 'Hello', 'values': 1234}
 
-    @device_b.on('*/direct-msg')
-    async def callback(event, data):  # pylint: disable=W0612
+    @device_b.on('direct-msg')
+    async def callback(sender, data):  # pylint: disable=W0612
         nonlocal message_received
-        print('device_b got message')
-        assert(event == 'device_a/direct-msg')
-        assert(data == TEST_DATA)
+        assert sender == 'device_a'
+        assert data == TEST_DATA
         message_received = True
 
     @device_a.task
     async def send_msg():  # pylint: disable=W0612
-        print('device_a sending message')
-        await device_a.send('device_b', 'direct-msg', TEST_DATA)
+        with suppress(UnknownPeer):
+            await device_a.send('device_b', 'direct-msg', TEST_DATA)
+        await device_a.sleep(0.1)
 
     device_b.start()
     device_a.start()
-    print('devices started')
-    sleep(0.05)
+    print(device_b._member._send_endpoints)
+    sleep(0.5)
     device_a.stop()
     device_b.stop()
-    print('done sleep')
-    assert(message_received)
+    assert message_received
 
 def test_storage():
     device = Device('device', 'test')
@@ -102,31 +104,36 @@ def test_storage():
     device.start()
     sleep(0.11)
     device.stop()
-    assert(device.storage.counter in (5, 6))  # 5 or 6 due to uncertain timing
+    assert device.storage.counter in (5, 6)  # 5 or 6 due to uncertain timing
 
 def test_request():
-    deviceA = Device('deviceA', 'rover')
-    deviceB = Device('deviceB', 'rover')
+    group = str(uuid4())
+
+    deviceA = Device('deviceA', group)
+    deviceA.storage.requested = False
+
+    deviceB = Device('deviceB', group)
     deviceB.storage.message_received = False
 
     TEST_DATA = 1234
 
-    @deviceA.on('*/request')
-    async def reply(event, data):  # pylint: disable=W0612
-        await deviceA.reply(event, TEST_DATA)
+    @deviceA.on_request('request')
+    async def reply():  # pylint: disable=W0612
+        return TEST_DATA
 
     @deviceB.task
     async def get_data():  # pylint: disable=W0612
-        data = await deviceB.request('deviceA', 'request')
-        assert(data == TEST_DATA)
-        print(data)
-        deviceB.storage.message_received = True
+        with suppress(UnknownPeer):
+            data = await deviceB.request('deviceA', 'request')
+            assert data == TEST_DATA
+            deviceB.storage.message_received = True
+        await deviceB.sleep(0.1)
 
     deviceA.start()
     deviceB.start()
-    sleep(0.1)
+    sleep(0.2)
     deviceB.stop()
     deviceA.stop()
-    assert(deviceB.storage.message_received)
+    assert deviceB.storage.message_received
 
 
