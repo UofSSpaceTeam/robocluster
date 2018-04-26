@@ -23,9 +23,9 @@ class Member(Looper):
         super().__init__(loop)
         self.name = name
         self.uid = int.from_bytes(os.urandom(4), 'big')
-        self.wanted = set()
+        self._wanted = set()
 
-        self.subscriptions = set()
+        self._subscriptions = set()
 
         self._send_endpoints = {}
         self._request_endpoints = {}
@@ -33,6 +33,12 @@ class Member(Looper):
         self._peers = {}
         self._accepter = _Accepter(self)
         self._gossiper = _Gossiper(self, network, port, key=key)
+
+    def is_wanted(self, name):
+        for want in self._wanted:
+            if fnmatch(name, want):
+                return True
+        return False
 
     def try_peer(self, peer):
         try:
@@ -45,8 +51,9 @@ class Member(Looper):
 
     def subscribe(self, peer, endpoint, callback):
         endpoint = '{}/{}'.format(peer, endpoint)
+        self._wanted.add(peer)
         self.on_recv(endpoint, callback)
-        self.subscriptions.add(endpoint)
+        self._subscriptions.add(endpoint)
 
     async def send(self, peer, endpoint, data):
         await self.try_peer(peer).send(endpoint, data)
@@ -59,7 +66,7 @@ class Member(Looper):
     async def _handle_send(self, source, endpoint, data):
         for end, callback in self._send_endpoints.items():
             if fnmatch(endpoint, end):
-                if endpoint in self.subscriptions:
+                if end in self._subscriptions:
                     await callback(endpoint, data)
                 else:
                     await callback(source, data)
@@ -124,7 +131,7 @@ class _Peer(_Component):
         self.uid = uid
 
         self._address = None
-        self.subscriptions = set()
+        self._subscriptions = set()
 
         self._wanted = set()
         self._is_wanted = asyncio.Event(loop=self.loop)
@@ -148,25 +155,29 @@ class _Peer(_Component):
 
     @property
     def connected(self):
-        self.member.wanted.add(self.name)
         return self._connected.wait()
 
-    async def send(self, endpoint, data):
+    async def send(self, endpoint, data, register=True):
         # TODO: timeout?
+        self.member._wanted.add(self.name)
         await self.connected
         packet = 'send', (endpoint, data)
         await self._send(packet)
 
     async def publish(self, endpoint, data):
-        for subscription in self.subscriptions:
+        for subscription in self._subscriptions:
             if fnmatch(endpoint, subscription):
-                await self.send(endpoint, data)
+                # peer should already be wanted from the other end
+                await self.connected
+                packet = 'send', (endpoint, data)
+                await self._send(packet)
 
     async def _handle_send(self, packet):
         endpoint, data = packet
         await self.member._handle_send(self.name, endpoint, data)
 
     async def request(self, endpoint, *args, **kwargs):
+        self.member._wanted.add(self.name)
         await self.connected
         rid = int.from_bytes(os.urandom(4), 'big')
         packet = 'request', (rid, endpoint, args, kwargs)
@@ -249,6 +260,12 @@ class _Peer(_Component):
             self._socket.close()
             self._socket = None
 
+    def is_wanted(self, name):
+        for want in self._wanted:
+            if fnmatch(name, want):
+                return True
+        return False
+
     @property
     def wanted(self):
         return self._wanted
@@ -257,7 +274,7 @@ class _Peer(_Component):
     def wanted(self, names):
         member = self.member
         self._wanted = names
-        if self.name in member.wanted or member.name in self._wanted:
+        if member.is_wanted(self.name) or self.is_wanted(member.name):
             self._is_wanted.set()
         else:
             self._is_wanted.clear()
@@ -318,7 +335,7 @@ class _Gossiper(_Component):
                 peer = member._peers[name] = _Peer(member, name, uid)
 
             peer.address = address
-            peer.subscriptions = subscriptions
+            peer._subscriptions = subscriptions
             peer.wanted = wanted
             peer.start()
 
@@ -329,8 +346,8 @@ class _Gossiper(_Component):
                 member.name,
                 member.uid,
                 member._accepter.port,
-                tuple(member.wanted),
-                tuple(member.subscriptions),
+                tuple(member._wanted),
+                tuple(member._subscriptions),
             )
             packet = self._key + json.dumps(data).encode()
             try:
