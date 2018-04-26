@@ -16,10 +16,9 @@ def test_pubsub():
     device_a = Device('device-a', group)
     device_b = Device('device-b', group)
 
-    @device_b.task
+    @device_b.every(0.1)
     async def publish():  # pylint: disable=W0612
         await device_b.publish(test_key, test_val)
-        await device_b.sleep(0.1) # do not hog
 
     @device_a.on('device-b/{}'.format(test_key))
     async def callback(event, data):  # pylint: disable=W0612

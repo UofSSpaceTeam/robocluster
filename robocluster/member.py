@@ -145,7 +145,7 @@ class _Peer(_Component):
         self._socket = None
         self._connected = asyncio.Event(loop=self.loop)
 
-        self.add_daemon_task(self._recv_loop)
+        self.create_daemon(self._recv_loop)
 
     @property
     def address(self):
@@ -302,8 +302,8 @@ class _Gossiper(_Component):
         self._socket = self.socket('udp', bind=('', self._address[1]))
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
-        self.add_daemon_task(self._recv_loop)
-        self.add_daemon_task(self._send_loop)
+        self.create_daemon(self._recv_loop)
+        self.create_daemon(self._send_loop)
 
     async def _recv_loop(self):
         member = self.member
@@ -367,7 +367,7 @@ class _Accepter(_Component):
         self._socket = self.socket('tcp', bind=('', 0))
         self._socket.listen()
 
-        self.add_daemon_task(self._accept_loop)
+        self.create_daemon(self._accept_loop)
 
     @property
     def port(self):
