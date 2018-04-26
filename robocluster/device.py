@@ -179,7 +179,7 @@ class Device(Looper):
         by the device when the device is started.
         """
         coro = as_coroutine(task)
-        self.add_daemon_task(coro)
+        self.create_task(coro)
         return task
 
     def every(self, duration):
@@ -201,13 +201,13 @@ class Device(Looper):
         """
         duration = duration_to_seconds(duration)
         def _decorator(func):
+            coro = as_coroutine(func)
             @wraps(func)
             async def _wrapper():
                 while True:
-                    coro = as_coroutine(func)
                     await coro()
                     await self.sleep(duration)
-            self.task(_wrapper)
+            self.create_daemon(_wrapper)
             return func
         return _decorator
 

@@ -16,10 +16,9 @@ def test_pubsub():
     device_a = Device('device-a', group)
     device_b = Device('device-b', group)
 
-    @device_b.task
+    @device_b.every(0.1)
     async def publish():  # pylint: disable=W0612
         await device_b.publish(test_key, test_val)
-        await device_b.sleep(0.1) # do not hog
 
     @device_a.on('device-b/{}'.format(test_key))
     async def callback(event, data):  # pylint: disable=W0612
@@ -62,6 +61,22 @@ def test_wildcard_pubsub():
     device_a.stop()
     device_b.stop()
     assert recieved_message
+
+def test_task():
+    group = str(uuid4())
+    device_a = Device('device_a', group)
+    counter = 0
+
+    @device_a.task
+    def increment():
+        nonlocal counter
+        counter += 1
+
+    device_a.start()
+    sleep(0.5)
+    device_a.stop()
+    assert counter == 1
+
 
 def test_every():
     # random group so we don't collide in testing

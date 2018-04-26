@@ -18,29 +18,37 @@ class Looper:
         if not isinstance(self._loop, asyncio.AbstractEventLoop):
             raise TypeError
 
-        self._coros = []
-        self._tasks = None
+        self._daemons = []
+        self._tasks = []
+        self._running_tasks = None
 
     @property
     def loop(self):
         return self._loop
 
-    def create_task(self, coro):
+    def create_task(self, coro, *args, **kwargs):
         """Create a task in the event loop."""
+        if self._running_tasks is None:
+            self._tasks.append((coro, args, kwargs))
+            return
+        self._create_task(self._coro_wrapper(coro, *args, **kwargs))
+
+    def _create_task(self, coro):
         def _create_task():
-            self._tasks.append(self.loop.create_task(coro))
+            self._running_tasks.append(self.loop.create_task(coro))
         self.loop.call_soon_threadsafe(_create_task)
 
-    def add_daemon_task(self, coro, *args, **kwargs):
+    def create_daemon(self, coro, *args, **kwargs):
         """
         Add a daemon task and starts it if the looper is started.
 
         Arguments and keyword arguments past coro are passed down to coro when
         it is started.
         """
-        self._coros.append((coro, args, kwargs))
-        if self._tasks is not None:
-            self.create_task(coro(*args, **kwargs))
+        # TODO: make this a class level decorator?
+        self._daemons.append((coro, args, kwargs))
+        if self._running_tasks is not None:
+            self._create_task(self._daemon_wrapper(coro, *args, *kwargs))
 
     def sleep(self, seconds):
         """
@@ -52,31 +60,44 @@ class Looper:
 
     def start(self):
         """Start daemon tasks."""
-        if self._tasks is not None:
+        if self._running_tasks is not None:
             return
 
+        self._running_tasks = []
+        for coro, args, kwargs in self._daemons:
+            self._create_task(self._daemon_wrapper(coro, *args, **kwargs))
+
+        for coro, args, kwargs in self._tasks:
+            self._create_task(self._coro_wrapper(coro, *args, **kwargs))
         self._tasks = []
-        for coro, args, kwargs in self._coros:
-            self.create_task(self._coro_wrapper(coro, *args, **kwargs))
 
     async def _coro_wrapper(self, coro, *args, **kwargs):
+        try:
+            await coro(*args, **kwargs)
+        except asyncio.CancelledError:
+            raise
+        except:  # pylint: disable=W0702
+            import traceback
+            traceback.print_exc()
+
+    async def _daemon_wrapper(self, coro, *args, **kwargs):
         while ...:
             try:
                 await coro(*args, **kwargs)
+                print('daemon exited', coro)
             except asyncio.CancelledError:
                 raise
             except:  # pylint: disable=W0702
                 import traceback
                 traceback.print_exc()
-                break
 
     def stop(self):
         """Stop daemon tasks."""
-        if self._tasks is None:
+        if self._running_tasks is None:
             return
-        for task in self._tasks:
+        for task in self._running_tasks:
             task.cancel()
-        self._tasks = None
+        self._running_tasks = None
 
     def __enter__(self):
         """Enter context manager, equivalent to calling start()."""
