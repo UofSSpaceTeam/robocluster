@@ -59,10 +59,7 @@ class Member(Looper):
     async def _handle_send(self, source, endpoint, data):
         for end, callback in self._send_endpoints.items():
             if fnmatch(endpoint, end):
-                if endpoint in self.subscriptions:
-                    await callback(endpoint, data)
-                else:
-                    await callback(source, data)
+                await callback(endpoint, data)
 
     def on_request(self, endpoint, callback):
         self._request_endpoints[endpoint] = as_coroutine(callback)
