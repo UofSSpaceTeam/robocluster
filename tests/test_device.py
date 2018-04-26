@@ -62,6 +62,22 @@ def test_wildcard_pubsub():
     device_b.stop()
     assert recieved_message
 
+def test_task():
+    group = str(uuid4())
+    device_a = Device('device_a', group)
+    counter = 0
+
+    @device_a.task
+    def increment():
+        nonlocal counter
+        counter += 1
+
+    device_a.start()
+    sleep(0.5)
+    device_a.stop()
+    assert counter == 1
+
+
 def test_every():
     # random group so we don't collide in testing
     group = str(uuid4())
