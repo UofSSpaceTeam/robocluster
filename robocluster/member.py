@@ -40,11 +40,13 @@ class Member(Looper):
                 return True
         return False
 
-    def try_peer(self, peer):
-        try:
-            return self._peers[peer]
-        except KeyError:
-            raise UnknownPeer(peer)
+    async def try_peer(self, peer):
+        for _ in range(5):
+            try:
+                return self._peers[peer]
+            except KeyError:
+                await self.sleep(self._gossiper.GOSSIP_RATE)
+        raise UnknownPeer(peer)
 
     def on_recv(self, endpoint, callback):
         self._send_endpoints[endpoint] = as_coroutine(callback)
@@ -56,7 +58,8 @@ class Member(Looper):
         self._subscriptions.add(endpoint)
 
     async def send(self, peer, endpoint, data):
-        await self.try_peer(peer).send(endpoint, data)
+        peer = await self.try_peer(peer)
+        await peer.send(endpoint, data)
 
     async def publish(self, endpoint, data):
         endpoint = '{}/{}'.format(self.name, endpoint)
@@ -75,7 +78,8 @@ class Member(Looper):
         self._request_endpoints[endpoint] = as_coroutine(callback)
 
     async def request(self, peer, endpoint, *args, **kwargs):
-        return await self.try_peer(peer).request(endpoint, *args, **kwargs)
+        peer = await self.try_peer(peer)
+        return await peer.request(endpoint, *args, **kwargs)
 
     async def _handle_request(self, endpoint, *args, **kwargs):
         try:

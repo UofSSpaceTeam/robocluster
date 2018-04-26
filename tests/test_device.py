@@ -4,7 +4,6 @@ from time import sleep, time
 from contextlib import suppress
 
 from robocluster import Device
-from robocluster.member import UnknownPeer
 
 
 def test_pubsub():
@@ -46,10 +45,9 @@ def test_wildcard_pubsub():
     device_a = Device('device-a', group)
     device_b = Device('device-b', group)
 
-    @device_b.task
+    @device_b.every(0.1)
     async def publish():  # pylint: disable=W0612
         await device_b.publish(test_key, test_val)
-        await device_b.sleep(0.1) # do not hog
 
     @device_a.on('*/{}'.format(test_key))
     async def callback(event, data):  # pylint: disable=W0612
@@ -110,13 +108,11 @@ def test_send():
 
     @device_a.task
     async def send_msg():  # pylint: disable=W0612
-        with suppress(UnknownPeer):
-            await device_a.send('device_b', 'direct-msg', TEST_DATA)
+        await device_a.send('device_b', 'direct-msg', TEST_DATA)
         await device_a.sleep(0.1)
 
     device_b.start()
     device_a.start()
-    print(device_b._member._send_endpoints)
     sleep(0.5)
     device_a.stop()
     device_b.stop()
@@ -152,11 +148,9 @@ def test_request():
 
     @deviceB.task
     async def get_data():  # pylint: disable=W0612
-        with suppress(UnknownPeer):
-            data = await deviceB.request('deviceA', 'request')
-            assert data == TEST_DATA
-            deviceB.storage.message_received = True
-        await deviceB.sleep(0.1)
+        data = await deviceB.request('deviceA', 'request')
+        assert data == TEST_DATA
+        deviceB.storage.message_received = True
 
     deviceA.start()
     deviceB.start()
