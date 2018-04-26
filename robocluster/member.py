@@ -159,8 +159,7 @@ class _Peer(_Component):
 
     async def send(self, endpoint, data, register=True):
         # TODO: timeout?
-        if register:
-            self.member._wanted.add(self.name)
+        self.member._wanted.add(self.name)
         await self.connected
         packet = 'send', (endpoint, data)
         await self._send(packet)
@@ -168,13 +167,17 @@ class _Peer(_Component):
     async def publish(self, endpoint, data):
         for subscription in self._subscriptions:
             if fnmatch(endpoint, subscription):
-                await self.send(endpoint, data, register=False)
+                # peer should already be wanted from the other end
+                await self.connected
+                packet = 'send', (endpoint, data)
+                await self._send(packet)
 
     async def _handle_send(self, packet):
         endpoint, data = packet
         await self.member._handle_send(self.name, endpoint, data)
 
     async def request(self, endpoint, *args, **kwargs):
+        self.member._wanted.add(self.name)
         await self.connected
         rid = int.from_bytes(os.urandom(4), 'big')
         packet = 'request', (rid, endpoint, args, kwargs)
