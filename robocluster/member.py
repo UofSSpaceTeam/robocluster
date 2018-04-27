@@ -227,7 +227,7 @@ class _Peer(_Component):
 
                 try:
                     await self._socket.connect(self._address)
-                except (ConnectionRefusedError, OSError):
+                except (ConnectionResetError, ConnectionRefusedError, OSError):
                     self.close()
                     await self.sleep(self.CONNECTION_RETRY_RATE)
                     continue
