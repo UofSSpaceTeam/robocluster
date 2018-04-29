@@ -1,3 +1,4 @@
+import sys
 from itertools import count
 from time import time
 from uuid import uuid4
@@ -6,14 +7,18 @@ from robocluster import Device
 
 # random group so we don't collide in testing
 group = str(uuid4())
+if len(sys.argv) > 1:
+    network = sys.argv[1]
+else:
+    network = None
 
-device_a = Device('device-a', group)
+device_a = Device('device-a', group, network=network)
 
 @device_a.on('device-b/*')
 def echo(event, data):
     print(event, data)
 
-device_b = Device('device-b', group)
+device_b = Device('device-b', group, network=network)
 device_b.storage.message = 'Hello World {}!'
 
 @device_b.task
@@ -28,11 +33,6 @@ async def hello_b():
 async def every_b():
     await device_b.publish('every', time())
 
-try:
-    device_a.start()
-    device_b.start()
-    device_a.wait()
-    device_b.wait()
-except KeyboardInterrupt:
-    device_a.stop()
-    device_b.stop()
+device_a.start()
+device_b.start()
+device_a.wait()
