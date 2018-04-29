@@ -20,11 +20,15 @@ async def create_process():
 @client.task
 async def start_printer():
     await client.sleep(4)
+    print('stop shell')
     await client.publish('stop', 'shell')
+    await client.sleep(2)
+    print('start printer')
     await client.publish('start', 'printer')
 
 try:
-    client.run()
+    client.start()
+    client.wait()
 except KeyboardInterrupt:
     async def shutdown():
         await client.publish('stop', 'printer')
