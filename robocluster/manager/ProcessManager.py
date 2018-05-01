@@ -1,226 +1,182 @@
-"""THIS FILE IS SUBJECT TO THE LICENSE TERMS GRANTED BY THE UNIVERSITY OF SASKATCHEWAN SPACE TEAM (USST)."""
-
 import shlex
-import sys
-import asyncio
-import logging
 from subprocess import Popen
-from time import sleep
+from threading import Thread
+import time
 
 from robocluster import Device
 
-log = logging.getLogger("Process-Manager")
-log.setLevel(logging.INFO)
-
 class RoboProcess:
-    """Manages and keeps track of a process."""
+
+    class RunnerThread(Thread):
+
+        def __init__(self, process, on_exit):
+            super().__init__()
+            self.process = process
+            self.on_exit = on_exit
+
+
+        def run(self):
+            if self.process:
+                returncode = self.process.wait()
+                self.on_exit(returncode)
 
     def __init__(self, name, cmd):
-        """Initialize a process containing command cmd."""
         if not isinstance(cmd, str):
             raise ValueError('command must be a string')
         self.name = name
         self.cmd = cmd
         self.pid = None
-        self.released = False
         self.process = None
+        self.killed = False
 
-    async def restart(self):
-        """
-        Restarts/starts a process. If the process is currenlty executing it will be killed then restarted.
+    def start(self):
+        if not self.process:
+            args = shlex.split(self.cmd)
+            self.process = Popen(args)
+            self.runner = RoboProcess.RunnerThread(self.process, self.on_exit)
+            self.runner.start()
 
-        Returns
-        -------
-        asyncio.subprocess.Process
-            The created asyncio process.
-        """
-
-        # if the process was released, unrelease it
-        self._released = False
-
-        # kill the process if it exists
-        await self.kill()
-
-        self.process = await asyncio.create_subprocess_shell(self.cmd)
-
-        self.pid = self.process.pid
-        return self.process
-
-    async def run(self):
-        """
-        Run the given process definition until it exists successfully. This function is a coroutine.
-
-        Returns
-        -------
-        int
-            The program's return value.
-        """
-        # start the loop until the process exists successfully
-        returncode = None
-        self.process = await self.restart()
-        while self.process:
-            log.info("Started process({}, '{}')".format(self.pid, self.name))
-            returncode = await self.process.wait()
-            last_pid = self.pid
-            self.pid = None
-            if self._released:
-                self.process = None
-            else:
-                self.on_exit(returncode)
-            if self.process:
-                log.warning("Process ({}, '{}') failed, exiting with {}. Restaring process.".format(last_pid, self.name, returncode))
-            else:
-                log.info("Process ({}, {}) exited successfully with {}.".format(last_pid, self.name, returncode))
-        return returncode
-
-    async def kill(self, timeout=1, release=False):
-        """
-        Stop the process.
-
-        Ignored if the process is not running.
-        """
+    def stop(self, timeout=0):
         if self.process:
-            self.process.terminate()
-            try:
-                future = self.process.wait()
-                await asyncio.wait_for(future, timeout)
-            except asyncio.TimeoutError:
-                self.process.kill()
-                await self.process.wait()
-            self.released = release
+            self.process.kill()
+            self.killed = True
+            self.runner.join(timeout)
+            print('killed')
 
     def on_exit(self, returncode):
         """To be called when the process exits"""
         raise NotImplementedError('RoboProcess does not define a default behaivior on exit. Please inherit and define the on_exit(returncode) method')
 
 class RunOnce(RoboProcess):
-    """Process that runs """
+
     def on_exit(self, returncode):
         self.process = None
 
-class RestartOnCrash(RoboProcess):
-    """Process that restarts on non zero exit"""
-    def on_exit(self, returncode):
-        if returncode != 0:
-            self.restart()
-        else:
-            self.process = None
 
+class RestartOnCrash(RoboProcess):
+
+    def on_exit(self, returncode):
+        self.process = None
+        if returncode != 0 and not self.killed:
+            print('restart')
+            self.start()
 
 class ProcessManager:
-    """
-    Manages processes that run in the robocluster framework.
-
-    Processes are programs that can run independently from each other, in any
-    language supported by the robocluster library.
-
-    The ProcessManager is in charge of starting and stopping processes, and
-    monitoring their status and handle the event of a crash or a process not
-    responding.
-    """
 
     def __init__(self):
-        """Initialize a process manager."""
-        self.processes = {}  # store processes by name
-        self._futures = []
-        self.remote_api_device = Device('remote-api', 'Manager')
-        self.loop = asyncio.get_event_loop()
+        self.processes = {}
+        self.remote_api = Device('remote-api', 'Manager')
 
-        @self.remote_api_device.on('*/createProcess')
+        @self.remote_api.on('*/createProcess')
         async def remote_createProcess(event, data):
-            print('got remote createProcess')
+            print('Got remote createProcess({})'.format(data))
             name = data['name']
             command = data['command']
             if data['type']:
                 try:
-                    proc = globals()[data['type']](name, command)  # gross?
+                    proc = globals()[data['type']](name, command)
                     self.addProcess(proc)
                 except AttributeError:
-                    print('ERROR: Invalid process type')
+                    print('ERROR: invalid process type')
                     return
             else:
-                print('Creating default process type')
+                print('Createing default process type')
                 self.createProcess(name, command)
             self.start(name)
 
-        @self.remote_api_device.on('*/stop')
+        @self.remote_api.on('*/stop')
         async def remote_stop(event, data):
-            print('Got remote stop')
+            print('Got remote stop {}'.format(data))
             self.stop(data)
 
-        @self.remote_api_device.on('*/start')
+        @self.remote_api.on('*/start')
         async def remote_start(event, data):
-            print('Starting: {}'.format(data))
+            print('Got remote start {}'.format(data))
             self.start(data)
 
-        # @self.remote_api_device.task
-        async def rem_print_started():
-            print('remote api running')
+        @self.remote_api.task
+        def rem_api_print():
+            print('Remote API running')
+
 
     def __enter__(self):
-        """Enter context manager."""
+        self.remote_api.start()
         return self
 
     def __exit__(self, *exc):
-        """Exit context manager, makes sure all processes are stopped."""
         self.stop()
-        self.remote_api_device.stop()
+        self.remote_api.stop()
         return False
 
-    def isEmpty(self):
-        """Return if processes is empty."""
-        return len(self.processes) == 0
-
     def createProcess(self, name, command):
-        """
-        Create a process.
-
-        Arguments:
-        name    - name to identify process, must be unique to process manager.
-        command - shell command for process to execute.
-        """
         self.addProcess(RoboProcess(name, command))
 
     def addProcess(self, roboprocess):
-        """Adds roboprocess that was created externally to the manager"""
         if roboprocess.name in self.processes:
-            raise ValueError('Process with the same name exists: {name}')
+            raise VauleError('Process with the same name exists: {}'.format(roboprocess.name))
         self.processes[roboprocess.name] = roboprocess
 
 
     def start(self, *names):
-        """
-        Start processes.
 
-        If no arguments are provided, starts all processes.
-        """
         processes = names if names else self.processes.keys()
         for process in processes:
             try:
                 print('Starting:', process)
-                self._futures.append(asyncio.ensure_future(
-                    self.processes[process].run()))
+                self.processes[process].start()
             except KeyError:
-                pass
+                print('Tried to start a process that doesnt exist')
 
-    def stop(self, *names, timeout=0):
-        """
-        Stop processes.
 
-        If no arguments are provided, stops all processes.
-        """
+    def stop(self, *names, timeout=1):
         processes = names if names else self.processes.keys()
         for process in processes:
             try:
                 print('Stopping:', process)
-                asyncio.run_coroutine_threadsafe(
-                        self.processes[process].kill(timeout=timeout, release=True),
-                        self.loop)
+                self.processes[process].stop(timeout)
             except KeyError:
-                pass
+                print('Tried to stop a process that doesnt exist')
 
-    def run(self):
-        """Run the event loop"""
-        self.remote_api_device.start()
-        self.loop.run_forever()
+    
 
+
+def test_procman():
+    # processes = [
+    #     RunOnce('sleep_exit', 'python ./sleep_exit.py'),
+    #     RestartOnCrash('crasher', 'python crasher.py'),
+    # ]
+    processes = [
+        RunOnce('printer', '/usr/bin/python3 demo/printer.py'),
+        RunOnce('random_stream', '/usr/bin/python3 demo/random_stream.py'),
+    ]
+    with ProcessManager() as manager:
+        for proc in processes:
+            manager.addProcess(proc)
+
+        manager.start()
+
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
+            
+
+
+def test_RunOnce():
+    proc = RunOnce('sleep_exit', 'python3 ./sleep_exit.py')
+    proc.start()
+    time.sleep(3)
+    proc.stop()
+    time.sleep(2)
+    proc.start()
+
+def test_restartCrash():
+    proc = RestartOnCrash('crasher', 'python ./crasher.py')
+    proc.start()
+    time.sleep(4)
+    proc.stop()
+
+
+if __name__ == '__main__':
+    test_procman()
