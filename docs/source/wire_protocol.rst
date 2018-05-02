@@ -1,6 +1,8 @@
 Wire Protocol Specification
 ===========================
 
+.. warning:: This is now out of date, will update soon.
+
 The following describes the various messages that Robocluster uses,
 and how they are formatted.
 

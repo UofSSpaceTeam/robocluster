@@ -9,6 +9,22 @@ robocluster.Device module
     :undoc-members:
     :show-inheritance:
 
+robocluster.Member module
+-------------------------
+
+.. automodule:: robocluster.member
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+robocluster.Looper module
+-------------------------
+
+.. automodule:: robocluster.looper
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 robocluster.Net module
 ----------------------
 
@@ -16,15 +32,6 @@ robocluster.Net module
     :members:
     :undoc-members:
     :show-inheritance:
-
-robocluster.Ports module
--------------------------------
-
-.. automodule:: robocluster.ports
-    :members:
-    :undoc-members:
-    :show-inheritance:
-    :imported-members:
 
 
 robocluster.Util module

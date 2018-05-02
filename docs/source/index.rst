@@ -12,6 +12,7 @@ Welcome to robocluster's documentation!
 
    intro
    tutorial
+   internals
    wire_protocol
    robocluster
 
