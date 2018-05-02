@@ -34,11 +34,13 @@ class RoboProcess:
         self.cmd = cmd
         self.pid = None
         self.process = None
+        self.returncode = None
         self.killed = False
 
     def start(self):
         """ Start the process."""
         if not self.process:
+            self.returncode = None
             args = shlex.split(self.cmd)
             self.process = Popen(args)
             self.runner = RoboProcess.RunnerThread(self.process, self.on_exit)
@@ -61,6 +63,8 @@ class RunOnce(RoboProcess):
 
     def on_exit(self, returncode):
         self.process = None
+        self.pid = None
+        self.returncode = returncode
 
 
 class RestartOnCrash(RoboProcess):
@@ -68,6 +72,8 @@ class RestartOnCrash(RoboProcess):
 
     def on_exit(self, returncode):
         self.process = None
+        self.pid = None
+        self.returncode = returncode
         if returncode != 0 and not self.killed:
             print('restart')
             self.start()
