@@ -22,7 +22,7 @@ class RoboProcess:
                 returncode = self.process.wait()
                 self.on_exit(returncode)
 
-    def __init__(self, name, cmd):
+    def __init__(self, name, cmd, cwd=None):
         """
         Args:
             name (str): A name to identify the process by.
@@ -36,13 +36,17 @@ class RoboProcess:
         self.process = None
         self.returncode = None
         self.killed = False
+        self.cwd = cwd
 
     def start(self):
         """ Start the process."""
         if not self.process:
             self.returncode = None
             args = shlex.split(self.cmd)
-            self.process = Popen(args)
+            if self.cwd is not None:
+                self.process = Popen(args, cwd=self.cwd)
+            else:
+                self.process = Popen(args)
             self.runner = RoboProcess.RunnerThread(self.process, self.on_exit)
             self.runner.start()
 
