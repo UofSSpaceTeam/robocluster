@@ -2,12 +2,16 @@ import asyncio
 import socket
 import json
 import os
+import logging
 from fnmatch import fnmatch
 from ipaddress import IPv4Network
 
 from .net import AsyncSocket
 from .looper import Looper
 from .util import as_coroutine
+
+
+log = logging.getLogger(__name__)
 
 
 class Error(Exception):
@@ -210,7 +214,26 @@ class _Peer(_Component):
     async def _send(self, packet):
         packet = json.dumps(packet).encode()
         size = len(packet).to_bytes(4, 'big')
-        await self._socket.send(size + packet)
+        try:
+            return await self._socket.send(size + packet)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log.exception(e)
+            self.close()
+            return 0
+
+    async def _recv(self, size):
+        try:
+            data = await self._socket.recv(size)
+            if not data:
+                self.close()
+            return data
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log.exception(e)
+            self.close()
 
     async def _recv_loop(self):
         member = self.member
@@ -235,14 +258,13 @@ class _Peer(_Component):
                 await self._send(member.name)
                 self._connected.set()
 
-            size = await self._socket.recv(4)
+            size = await self._recv(4)
             if not size:
                 # Other side has been closed
-                self.close()
                 continue
 
             size = int.from_bytes(size, 'big')
-            data = await self._socket.recv(size)
+            data = await self._recv(size)
 
             try:
                 data = json.loads(data.decode())
@@ -357,7 +379,7 @@ class _Gossiper(_Component):
             try:
                 await self._socket.sendto(packet, self._address)
             except OSError as e:
-                print(e)
+                log.exception(e)
             await self.sleep(self.GOSSIP_RATE)
 
 
