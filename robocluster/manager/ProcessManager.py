@@ -2,6 +2,7 @@ import shlex
 from subprocess import Popen
 from threading import Thread
 import time
+import socket
 
 from robocluster import Device
 
@@ -93,10 +94,11 @@ class ProcessManager:
     and providing a remote API for other ProcessManagers to submit new processes.
     """
 
-    def __init__(self):
+    def __init__(self, name=socket.gethostname(), network=None):
         """Initialize a process manager."""
         self.processes = {}
-        self.remote_api = Device('remote-api', 'Manager')
+        self.remote_api = Device(name, 'Manager', network=network)
+        self.name = name
 
         @self.remote_api.on('*/createProcess')
         async def remote_createProcess(event, data):
