@@ -23,7 +23,7 @@ class RoboProcess:
                 returncode = self.process.wait()
                 self.on_exit(returncode)
 
-    def __init__(self, name, cmd, cwd=None):
+    def __init__(self, name, cmd, cwd=None, host=None):
         """
         Args:
             name (str): A name to identify the process by.
@@ -38,6 +38,7 @@ class RoboProcess:
         self.returncode = None
         self.killed = False
         self.cwd = cwd
+        self.host = host
 
     def start(self):
         """ Start the process."""
@@ -100,7 +101,7 @@ class ProcessManager:
         self.remote_api = Device(name, 'Manager', network=network)
         self.name = name
 
-        @self.remote_api.on('*/createProcess')
+        @self.remote_api.on('createProcess')
         async def remote_createProcess(event, data):
             print('Got remote createProcess({})'.format(data))
             name = data['name']
@@ -117,12 +118,12 @@ class ProcessManager:
                 self.createProcess(name, command)
             self.start(name)
 
-        @self.remote_api.on('*/stop')
+        @self.remote_api.on('stop')
         async def remote_stop(event, data):
             print('Got remote stop {}'.format(data))
             self.stop(data)
 
-        @self.remote_api.on('*/start')
+        @self.remote_api.on('start')
         async def remote_start(event, data):
             print('Got remote start {}'.format(data))
             self.start(data)
@@ -158,6 +159,13 @@ class ProcessManager:
         if roboprocess.name in self.processes:
             raise VauleError('Process with the same name exists: {}'.format(roboprocess.name))
         self.processes[roboprocess.name] = roboprocess
+        if roboprocess.host is not None:
+            d = {
+                'name':roboprocess.name,
+                'command':roboprocess.cmd,
+                'type':roboprocess.__class__.__name__
+            }
+            self.remote_api.send(roboprocess.host, 'CreateProcess', d)
 
 
     def start(self, *names):
@@ -168,10 +176,14 @@ class ProcessManager:
         """
 
         processes = names if names else self.processes.keys()
-        for process in processes:
+        for procname in processes:
             try:
-                print('Starting:', process)
-                self.processes[process].start()
+                host = self.processes[procname].host
+                if host is None:
+                    print('Starting:', procname)
+                    self.processes[procname].start()
+                else:
+                    self.remote_api.send(host, 'start', procname)
             except KeyError:
                 print('Tried to start a process that doesnt exist')
 
@@ -183,10 +195,14 @@ class ProcessManager:
         If no arguments are provided, stops all processes.
         """
         processes = names if names else self.processes.keys()
-        for process in processes:
+        for procname in processes:
             try:
-                print('Stopping:', process)
-                self.processes[process].stop(timeout)
+                host = self.processes[procname].host
+                if host is None:
+                    print('Stopping:', procname)
+                    self.processes[procname].stop(timeout)
+                else:
+                    self.remote_api.send(host, 'stop', procname)
             except KeyError:
                 print('Tried to stop a process that doesnt exist')
 
