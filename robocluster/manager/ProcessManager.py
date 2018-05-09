@@ -157,7 +157,8 @@ class ProcessManager:
     def addProcess(self, roboprocess):
         """Adds roboprocess that was created externally to the manager"""
         if roboprocess.name in self.processes:
-            raise VauleError('Process with the same name exists: {}'.format(roboprocess.name))
+            print('Process with the same name exists: {}'.format(roboprocess.name))
+            return
         self.processes[roboprocess.name] = roboprocess
         if roboprocess.host is not None:
             d = {
@@ -165,7 +166,10 @@ class ProcessManager:
                 'command':roboprocess.cmd,
                 'type':roboprocess.__class__.__name__
             }
-            self.remote_api.send(roboprocess.host, 'CreateProcess', d)
+            print('remote starting proc')
+            @self.remote_api.task
+            async def remote_create():
+                await self.remote_api.send(roboprocess.host, 'createProcess', d)
 
 
     def start(self, *names):
@@ -183,7 +187,9 @@ class ProcessManager:
                     print('Starting:', procname)
                     self.processes[procname].start()
                 else:
-                    self.remote_api.send(host, 'start', procname)
+                    @self.remote_api.task
+                    async def remote_start():
+                        await self.remote_api.send(host, 'start', procname)
             except KeyError:
                 print('Tried to start a process that doesnt exist')
 
@@ -202,7 +208,9 @@ class ProcessManager:
                     print('Stopping:', procname)
                     self.processes[procname].stop(timeout)
                 else:
-                    self.remote_api.send(host, 'stop', procname)
+                    @self.remote_api.task
+                    async def remote_start():
+                        await self.remote_api.send(host, 'stop', procname)
             except KeyError:
                 print('Tried to stop a process that doesnt exist')
 
