@@ -3,6 +3,7 @@ from subprocess import Popen
 from threading import Thread
 import time
 import socket
+import asyncio
 
 from robocluster import Device
 
@@ -141,6 +142,11 @@ class ProcessManager:
     def __exit__(self, *exc):
         """Exit context manager, makes sure all processes are stopped"""
         self.stop()
+        loop = self.remote_api.loop
+        for proc in self.processes.values():
+            if proc.host is not None:
+                # Throws RuntimeError, but doesn't work if the exeption is handled...
+                loop.run_until_complete(self.remote_api.send(proc.host, 'stop', proc.name))
         self.remote_api.stop()
         return False
 
