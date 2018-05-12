@@ -1,5 +1,6 @@
 '''Example of a files that configures the processes and runs them'''
 from robocluster.manager.ProcessManager import ProcessManager, RunOnce
+import time
 
 PATH = './demo'
 
@@ -20,6 +21,7 @@ with ProcessManager() as manager:
 
     try:
         # Run asyncio event loop
-        manager.run()
+        while True:
+            time.sleep(1)
     except KeyboardInterrupt:
         pass # exit cleanly
