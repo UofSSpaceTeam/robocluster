@@ -15,5 +15,14 @@ def test_add_process():
     manager.addProcess(proc)
     assert('echo-test' in manager.processes)
 
+def test_start_manager():
+    #TODO: actually test things?
+    proc = RunOnce('echo-test', 'echo "Hello world"')
+    with ProcessManager() as manager:
+        manager.addProcess(proc)
+        manager.start()
+        time.sleep(1)
+
+
 if __name__ == '__main__':
     test_add_process()
