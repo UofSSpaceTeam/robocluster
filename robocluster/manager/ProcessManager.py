@@ -173,7 +173,7 @@ class ProcessManager:
             }
             print('remote starting proc')
             @self.remote_api.task
-            async def remote_create():
+            async def remote_create():  # pylint: disable=W0612
                 await self.remote_api.send(roboprocess.host, 'createProcess', d)
 
 
@@ -193,7 +193,7 @@ class ProcessManager:
                     self.processes[procname].start()
                 else:
                     @self.remote_api.task
-                    async def remote_start():
+                    async def remote_start():  # pylint: disable=W0612
                         await self.remote_api.send(host, 'start', procname)
             except KeyError:
                 print('Tried to start a process that doesnt exist')
