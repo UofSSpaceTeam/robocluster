@@ -3,7 +3,6 @@ from subprocess import Popen
 from threading import Thread
 import time
 import socket
-import asyncio
 
 from robocluster import Device
 
@@ -103,7 +102,7 @@ class ProcessManager:
         self.name = name
 
         @self.remote_api.on('createProcess')
-        async def remote_createProcess(event, data):
+        async def remote_createProcess(event, data):  # pylint: disable=W0612
             print('Got remote createProcess({})'.format(data))
             name = data['name']
             command = data['command']
@@ -120,17 +119,17 @@ class ProcessManager:
             self.start(name)
 
         @self.remote_api.on('stop')
-        async def remote_stop(event, data):
+        async def remote_stop(event, data):  # pylint: disable=W0612
             print('Got remote stop {}'.format(data))
             self.stop(data)
 
         @self.remote_api.on('start')
-        async def remote_start(event, data):
+        async def remote_start(event, data):  # pylint: disable=W0612
             print('Got remote start {}'.format(data))
             self.start(data)
 
         @self.remote_api.task
-        def rem_api_print():
+        def rem_api_print():  # pylint: disable=W0612
             print('Remote API running')
 
 
