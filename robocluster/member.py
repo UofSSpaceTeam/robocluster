@@ -67,7 +67,9 @@ class Member(Looper):
 
     async def publish(self, endpoint, data):
         endpoint = '{}/{}'.format(self.name, endpoint)
-        for peer in self._peers.values():
+        # grab list of peers before we give up control
+        peers = tuple(self._peers.values())
+        for peer in peers:
             await peer.publish(endpoint, data)
 
     async def _handle_send(self, source, endpoint, data):
