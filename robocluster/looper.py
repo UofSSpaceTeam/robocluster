@@ -36,6 +36,7 @@ class Looper:
     def _create_task(self, coro):
         def _create_task():
             self._running_tasks.append(self.loop.create_task(coro))
+            # self.loop.create_task(coro) calls asyncio's "create_task"
         self.loop.call_soon_threadsafe(_create_task)
 
     def create_daemon(self, coro, *args, **kwargs):
